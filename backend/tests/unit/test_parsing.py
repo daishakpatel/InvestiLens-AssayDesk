@@ -244,3 +244,31 @@ def test_inline_tagged_figures_stay_in_their_sentence() -> None:  # DP-001, FR-F
         "The median employee was $111,905 2, a ratio of 363 to 1.",
         "The CEO was paid $40,644,723 1.",
     ]
+
+
+def test_an_annual_report_bound_after_item_15_is_sectioned() -> None:  # DP-001, FR-EX-012
+    # JPM's Items 7 and 8 only point to pages of the annual report printed after Item 15; that
+    # report's own headings start the real MD&A and financial statements.
+    blocks = [
+        Block("text", "Item 7. Management's Discussion and Analysis"),
+        Block("text", "Management's discussion and analysis appears on pages 52-135."),
+        Block("text", "Item 8. Financial Statements and Supplementary Data"),
+        Block("text", "The Consolidated Financial Statements appear on pages 182-319."),
+        Block("text", "Item 15. Exhibits, Financial Statement Schedules"),
+        Block("text", "Exhibit 21 List of subsidiaries."),
+        Block("text", "Management\u2019s discussion and analysis"),
+        Block("text", "Net income was $57.0 billion."),
+        Block("text", "Report of Independent Registered Public Accounting Firm"),
+        Block("text", "Note 1 - Basis of presentation"),
+        Block("text", "Glossary of Terms and Acronyms"),
+        Block("text", "AWM: Asset & Wealth Management"),
+    ]
+    sections = detect_sections(blocks, "10-K").sections
+    assert [(s.key, s.start_idx, s.end_idx) for s in sections] == [
+        ("10k_item7", 0, 2),  # the pointer stays, as written
+        ("10k_item8", 2, 4),
+        ("10k_item15", 4, 6),  # the exhibit list only
+        ("10k_item7", 6, 8),
+        ("10k_item8", 8, 10),
+        ("document", 10, 12),
+    ]
