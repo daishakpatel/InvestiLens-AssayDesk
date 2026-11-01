@@ -68,6 +68,16 @@ _TITLE_ITEMS: dict[str, list[tuple[re.Pattern[str], str]]] = {
     ],
 }
 
+# A 10-K whose Item 7 or 8 only points to an annual report bound in after the last item (JPM):
+# that report's own headings start the real sections. A pointer is a section this short.
+_BOUND_REPORT: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"management's discussion and analysis.*"), "7"),
+    (re.compile(r"management's report on internal control over financial reporting"), "9A"),
+    (re.compile(r"report of independent registered public accounting firm"), "8"),
+    (re.compile(r"glossary of terms( and acronyms)?"), "0"),
+]
+_POINTER_BLOCKS = 5
+
 # Core items used to score detection confidence.
 _CORE_10K = {"1", "1A", "2", "3", "5", "7", "7A", "8", "9A"}
 _CORE_10Q = {"P1-1", "P1-2"}  # financial statements + notes, and MD&A
@@ -154,13 +164,17 @@ def _label(filing_type: str, code: str) -> str:
     return f"Item {code}"
 
 
-def _title_starts(blocks: list[Block], filing_type: str) -> list[tuple[int, str, str, str]]:
-    """(block index, code, label, title) for an annual-report layout's own headings."""
-    rules = _TITLE_ITEMS["10-Q" if filing_type.startswith("10-Q") else "10-K"]
-    seen: set[int] = set()  # each rule once: its first heading
+def _titled_headings(
+    blocks: list[Block],
+    filing_type: str,
+    rules: list[tuple[re.Pattern[str], str]],
+    start: int = 0,
+) -> list[tuple[int, str, str, str]]:
+    """(block index, code, label, title) of each rule's first whole-heading match from `start`."""
+    seen: set[int] = set()
     out: list[tuple[int, str, str, str]] = []
-    for idx, block in enumerate(blocks):
-        raw = _short_text(block) or _layout_row(block)
+    for idx in range(start, len(blocks)):
+        raw = _short_text(blocks[idx]) or _layout_row(blocks[idx])
         if not raw:
             continue
         text = " ".join(raw.replace("\u2019", "'").lower().split()).rstrip(":.")
@@ -170,6 +184,13 @@ def _title_starts(blocks: list[Block], filing_type: str) -> list[tuple[int, str,
                 label = raw.strip() if code == WHOLE_DOCUMENT else _label(filing_type, code)
                 out.append((idx, code, label, "" if code == WHOLE_DOCUMENT else raw.strip()))
                 break
+    return out
+
+
+def _title_starts(blocks: list[Block], filing_type: str) -> list[tuple[int, str, str, str]]:
+    """(block index, code, label, title) for an annual-report layout's own headings."""
+    rules = _TITLE_ITEMS["10-Q" if filing_type.startswith("10-Q") else "10-K"]
+    out = _titled_headings(blocks, filing_type, rules)
     if out and out[0][1] == "1":
         # The overview and strategy printed before "Our Business" belong to Item 1; without
         # this they would fall before the first section and be dropped.
@@ -177,6 +198,15 @@ def _title_starts(blocks: list[Block], filing_type: str) -> list[tuple[int, str,
     elif out and out[0][0] > 0:
         out.insert(0, (-1, WHOLE_DOCUMENT, "Filing text", ""))
     return out
+
+
+def _points_elsewhere(starts: list[tuple[int, str, str, str]], total: int) -> bool:
+    """Item 7 or Item 8 is a pointer ("appears on pages 52-135 of the Annual Report")."""
+    for position, (idx, code, _label, _title) in enumerate(starts):
+        end = starts[position + 1][0] if position + 1 < len(starts) else total
+        if code in ("7", "8") and end - idx <= _POINTER_BLOCKS:
+            return True
+    return False
 
 
 def section_key(filing_type: str, code: str) -> str:
@@ -212,6 +242,10 @@ def detect_sections(blocks: list[Block], filing_type: str) -> SectionResult:
     starts = sorted((idx, code, label, title) for code, (idx, label, title) in last_by_code.items())
     if not starts and filing_type.startswith(("10-K", "10-Q")):
         starts = _title_starts(blocks, filing_type)
+    elif filing_type.startswith("10-K") and _points_elsewhere(starts, len(blocks)):
+        starts = sorted(
+            starts + _titled_headings(blocks, filing_type, _BOUND_REPORT, starts[-1][0] + 1)
+        )
     if (
         filing_type.startswith("10-Q")
         and starts

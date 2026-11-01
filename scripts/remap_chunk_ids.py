@@ -34,7 +34,10 @@ from sqlalchemy.types import String, Text
 from app.db import session_scope
 
 # A text chunk ID from before v5: "{document}_{item}_{n}" (item may be dotted or part-qualified).
-_OLD_ID = re.compile(r"\b\d+_[A-Za-z0-9.\-]+_\d+\b")
+_OLD_ID = re.compile(r"\b\d+_[A-Za-z0-9.\-]+_p?\d+\b")
+# A table chunk: "{document}_{item}_{table}". Its item changes when its section does (JPM's
+# statements moved from Item 15 to Item 8); the document and table number do not.
+_TABLE_ID = re.compile(r"\b(\d+)_[A-Za-z0-9.\-]+_(t\d+)\b")
 
 _CHUNKS = table(
     "document_chunks",
@@ -50,23 +53,32 @@ def _norm(value: str) -> str:
     return " ".join(value.replace("\u2019", "'").split()).lower()
 
 
-def match_new_id(quote: str | None, old_text: str, candidates: list[tuple[str, str]]) -> str | None:
-    """The new chunk holding `quote`, else the one holding a run of the old chunk's words."""
+def _shingles(words: list[str], size: int = 8) -> set[str]:
+    return {" ".join(words[i : i + size]) for i in range(max(1, len(words) - size + 1))}
+
+
+def match_new_id(
+    quote: str | None, old_id: str, old_text: str, candidates: list[tuple[str, str]]
+) -> str | None:
+    """The new chunk for an old one: the same ID if its text is unchanged; else, among the chunks
+    holding `quote` (or all of them), the one sharing the most of the old text. Chunks overlap
+    (each starts with the previous one's tail), so the first chunk holding the old chunk's opening
+    words can be its neighbour; the best overlap is the chunk itself."""
+    old_norm = _norm(old_text)
     texts = [(pid, _norm(body)) for pid, body in candidates]
-    if quote and (needle := _norm(quote)):
-        for pid, body in texts:
-            if needle in body:
-                return pid
-    words = _norm(old_text).split()
-    for size in (30, 15, 8):
-        for start in (0, max(0, len(words) // 2 - size // 2)):
-            window = " ".join(words[start : start + size])
-            if len(window) < 20:
-                continue
-            for pid, body in texts:
-                if window in body:
-                    return pid
-    return None
+    if any(pid == old_id and body == old_norm for pid, body in texts):
+        return old_id
+    if quote and (needle := _norm(quote)) and (holding := [t for t in texts if needle in t[1]]):
+        texts = holding
+    old = _shingles(old_norm.split())
+    best, best_score = None, 0
+    for pid, body in texts:
+        score = len(old & _shingles(body.split()))
+        if score > best_score:
+            best, best_score = pid, score
+    if best is None and quote and texts and len(texts) < len(candidates):
+        return texts[0][0]  # the quote alone placed it (old text too short to compare)
+    return best
 
 
 class Remapper:
@@ -87,12 +99,31 @@ class Remapper:
             self._new[document_id] = [(r.paragraph_id, r.text) for r in rows]
         return self._new[document_id]
 
+    def _table(self, old_id: str) -> str | None:
+        """A table chunk's ID now: same document and table number, whatever its section."""
+        m = _TABLE_ID.fullmatch(old_id)
+        if m is None:
+            return None
+        rows = self.session.execute(
+            select(_CHUNKS.c.paragraph_id).where(
+                _CHUNKS.c.document_id == int(m.group(1)),
+                _CHUNKS.c.paragraph_id.like(f"{m.group(1)}\\_%\\_{m.group(2)}"),
+            )
+        ).all()
+        return rows[0].paragraph_id if len(rows) == 1 else None
+
     def resolve(self, where: str, old_id: str | None, quote: str | None = None) -> str | None:
-        """The new ID for `old_id`, or None when it is not an old text chunk or has no match."""
+        """The new ID for `old_id`, or None when it is not an old chunk or has no match."""
         snap = self.old.get(old_id or "")
         if snap is None:
+            moved = self._table(old_id or "")
+            if moved is not None and moved != old_id:
+                self.stats[f"{where}: table moved"] += 1
+                return moved
             return None
-        new_id = match_new_id(quote, snap["text"], self._candidates(snap["document_id"]))
+        new_id = match_new_id(
+            quote, old_id or "", snap["text"], self._candidates(snap["document_id"])
+        )
         self.stats[f"{where}: {'remapped' if new_id else 'unmatched'}"] += 1
         if new_id is None:
             self.unmatched.append(f"{where} {old_id}")
@@ -102,7 +133,8 @@ class Remapper:
         """Every old text chunk ID inside a serialised value: `known` matches first, else the
         old chunk's words."""
         known = known or {}
-        return _OLD_ID.sub(
+        pattern = re.compile(f"{_OLD_ID.pattern}|{_TABLE_ID.pattern}")
+        return pattern.sub(
             lambda m: known.get(m.group(0)) or self.resolve(where, m.group(0)) or m.group(0), value
         )
 
