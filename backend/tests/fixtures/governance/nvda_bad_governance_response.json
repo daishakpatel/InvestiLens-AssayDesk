@@ -4,15 +4,15 @@
   "recorded_as": "A deliberately bad model reply: two fields verify; the rest must come back null (fabricated quote, wrong type, number not in the quote, committees not in the quote, invented paragraph ID, a nominee count paired with a current-board count) and the model's own independence_ratio must be ignored.",
   "response": {
     "fields": {
-      "board_size": {"value": 10, "quote": "Our Board currently consists of 10 members", "paragraph_id": "1_SOP_59"},
-      "lead_independent_director": {"value": true, "quote": "by having an independent Lead Director, rather than a chairperson", "paragraph_id": "1_IND_87"},
-      "independent_directors": {"value": 9, "quote": "Our nominees include 9 independent directors", "paragraph_id": "1_SOP_59"},
-      "dual_class": {"value": true, "quote": "NVIDIA has two classes of common stock with different voting rights", "paragraph_id": "1_SOP_59"},
-      "classified_board": {"value": "no", "quote": "Our Board currently consists of 10 members", "paragraph_id": "1_SOP_59"},
-      "say_on_pay_support_pct": {"value": 95, "quote": "Our Board currently consists of 10 members", "paragraph_id": "1_SOP_59"},
-      "committees": {"value": ["Audit Committee", "Risk Committee"], "quote": "The Board believes its leadership structure facilitates robust", "paragraph_id": "1_COM_102"},
+      "board_size": {"value": 10, "quote": "Our Board currently consists of 10 members", "paragraph_id": "1_SOP_p59"},
+      "lead_independent_director": {"value": true, "quote": "by having an independent Lead Director, rather than a chairperson", "paragraph_id": "1_IND_p87"},
+      "independent_directors": {"value": 9, "quote": "Our nominees include 9 independent directors", "paragraph_id": "1_SOP_p59"},
+      "dual_class": {"value": true, "quote": "NVIDIA has two classes of common stock with different voting rights", "paragraph_id": "1_SOP_p59"},
+      "classified_board": {"value": "no", "quote": "Our Board currently consists of 10 members", "paragraph_id": "1_SOP_p59"},
+      "say_on_pay_support_pct": {"value": 95, "quote": "Our Board currently consists of 10 members", "paragraph_id": "1_SOP_p59"},
+      "committees": {"value": ["Audit Committee", "Risk Committee"], "quote": "The Board believes its leadership structure facilitates robust", "paragraph_id": "1_COM_p102"},
       "ceo_chair_combined": {"value": false, "quote": "having an independent Lead Director, rather than a chairperson", "paragraph_id": "9_XX_1"},
-      "independence_ratio": {"value": 0.99, "quote": "Our Board currently consists of 10 members", "paragraph_id": "1_SOP_59"}
+      "independence_ratio": {"value": 0.99, "quote": "Our Board currently consists of 10 members", "paragraph_id": "1_SOP_p59"}
     },
     "independence_ratio": 0.99
   }
