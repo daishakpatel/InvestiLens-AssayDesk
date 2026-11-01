@@ -272,3 +272,49 @@ def test_an_annual_report_bound_after_item_15_is_sectioned() -> None:  # DP-001,
         ("10k_item8", 8, 10),
         ("document", 10, 12),
     ]
+
+
+def test_a_quarterly_report_listing_items_only_in_its_contents_is_sectioned() -> None:  # FR-EX-012
+    # JPM's 10-Q names Part I's items only in a page-number table: MD&A opens with the financial
+    # highlights and Item 1 with the first statement; the glossary ends Item 1.
+    blocks = [
+        Block("text", "FORM 10-Q"),
+        Block("text", "Consolidated financial highlights (unaudited)"),
+        Block("text", "Net income was $15.0 billion."),
+        Block("text", "Consolidated statements of income (unaudited)"),
+        Block("text", "Note 1 - Basis of presentation"),
+        _heading_row("GLOSSARY OF TERMS AND ACRONYMS"),
+        Block("text", "AWM: Asset & Wealth Management"),
+        Block("text", "Item 3. Quantitative and Qualitative Disclosures About Market Risk."),
+    ]
+    result = detect_sections(blocks, "10-Q")
+    assert [(s.key, s.start_idx, s.end_idx) for s in result.sections] == [
+        ("10q_part1_unitemized", -1, 1),  # the cover only
+        ("10q_part1_item2", 1, 3),
+        ("10q_part1_item1_notes", 3, 5),
+        ("document", 5, 7),
+        ("10q_part1_item3", 7, 8),
+    ]
+    assert not result.low_confidence
+
+
+def test_jpm_10q_fixture_has_its_statements_and_mdna() -> None:  # FR-EX-012
+    html = fixture_gzip_bytes("jpm", "10q.htm.gz").decode()
+    result = detect_sections(linearize(clean_tree(html)), "10-Q")
+    assert {"P1-1", "P1-2"} <= {s.item_code for s in result.sections}
+    assert not result.low_confidence
+
+
+def test_item_headings_set_as_one_row_tables_are_found() -> None:  # DP-001, FR-EX-012
+    # AMD's 10-Q sets each item heading as ["ITEM 1.", "CONDENSED CONSOLIDATED ..."].
+    blocks = [
+        Block("text", "PART I. FINANCIAL INFORMATION"),
+        _heading_row("ITEM 1. CONDENSED CONSOLIDATED FINANCIAL STATEMENTS"),
+        Block("text", "Net revenue 7,685"),
+        _heading_row("ITEM 2. MANAGEMENT'S DISCUSSION AND ANALYSIS"),
+        Block("text", "PART II. OTHER INFORMATION"),
+        _heading_row("ITEM 1. LEGAL PROCEEDINGS"),
+    ]
+    result = detect_sections(blocks, "10-Q")
+    assert [s.item_code for s in result.sections] == ["P1-1", "P1-2", "P2-1"]
+    assert not result.low_confidence

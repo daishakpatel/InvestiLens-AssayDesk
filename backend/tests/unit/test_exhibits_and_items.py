@@ -122,7 +122,7 @@ def test_10q_part_one_item_one_is_chunked_with_its_own_key() -> None:
 
 
 def test_10q_without_part_one_headings_keeps_the_text_and_is_flagged() -> None:
-    # JPM's cross-reference layout has no Part I item headings: keep, never drop, and flag.
+    # No Part I item heading and none of JPM's own titles either: keep, never drop, and flag.
     blocks = _text("Cover", "Consolidated balance sheets", "Part II", "Item 1. Legal Proceedings")
     result = detect_sections(blocks, "10-Q")
     assert [s.item_code for s in result.sections] == ["P1-0", "P2-1"]
