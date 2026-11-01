@@ -80,7 +80,10 @@ for exact-term recall that pure semantic search can miss.
 
 `app/rag/search.py` exposes `vector_search`, `vector_search_by_vector`, and `keyword_search` —
 each over **one** index, company-scoped (RAG-013). Combining them (RRF fusion, reranking) is the
-Phase 2c pipeline below.
+Phase 2c pipeline below. An optional `SearchScope(section_keys, filed_since)` narrows both to some
+sections (`chunk_metadata.section_key`) and to filings on or after a date; report sections use it
+(ADR-0053). A scoped vector search sets `hnsw.iterative_scan = strict_order`, so it needs
+pgvector >= 0.8.
 
 Keyword search first requires every word of the query (`websearch_to_tsquery`). A full-sentence
 question rarely passes that, so when the strict match is empty it widens to any of the words,

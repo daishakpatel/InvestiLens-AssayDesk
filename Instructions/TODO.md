@@ -38,10 +38,9 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 ### AI answers and reports
 
 - [ ] **News summary is empty in every report**: news is still sample data. `[code]`
-- [ ] **Report sections search with fixed keywords and no preference for recent filings**
-      (`_SECTION_QUERY` in `backend/app/research/report.py`): NVDA's bull case picked up crypto
-      "mining demand" from older 10-Ks, and AMD's management section quoted forward-looking-
-      statement boilerplate. `[code]`
+- [x] **Report sections search with fixed keywords and no preference for recent filings**:
+      fixed 2026-11-01 (ADR-0053), see "Done". The queries are still fixed keywords, but each
+      section now searches only its own filing sections, latest 10-K onward. `[code]`
 - [ ] **Price questions go to document search**: "what was the stock high on Sep 29" or "stock price
       today" are not answered from `price_history` (prices have no citable source type yet). One
       such question sent 23k tokens of context, well over the 6,000-token budget. Plain "margins"
@@ -531,3 +530,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   (`backups/assay-desk-20261101T183538Z.dump`, snapshot `chunks-v5-pre-10q-20261101.json`), the 18
   documents re-parsed by clearing `parser_version` (no version bump), stored references remapped
   with none unmatched, new chunks embedded.
+- 2026-11-01 — **Report sections search their own filing sections** (ADR-0053): every report
+  section searched all five years of a company's filings, proxies and press releases. On the dev
+  DB, NVIDIA's management commentary was ten proxy passages, its bull/bear pool cited FY2022–2025
+  crypto mining, and AMD's risks were ten press-release safe-harbor paragraphs. `SearchScope`
+  (section keys + filed-since, both indexes) now limits each section to MD&A, risk factors or the
+  business description from the latest 10-K onward, with an unscoped fallback when nothing is in
+  scope; safe-harbor disclaimers are dropped. Scoped vector search uses `hnsw.iterative_scan`
+  (pgvector >= 0.8; check the hosted version before deploying).
