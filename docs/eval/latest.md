@@ -1,6 +1,6 @@
 # Evaluation report
 
-Generated 2026-11-01T01:48:46+00:00 from `18e44f20e90d43a65764583e92ede6705c7c815d` (uncommitted changes) by `make eval-report`.
+Generated 2026-11-01T02:49:47+00:00 from `b9fd19a701402ca90d1bf5cd8769ae11df2b8f0d` (uncommitted changes) by `make eval-report`.
 
 - **LLM:** mock (FakeLLM (deterministic))
 - **Dataset:** golden_v0, 106 cases + 11 injection inputs
@@ -21,8 +21,8 @@ Generated 2026-11-01T01:48:46+00:00 from `18e44f20e90d43a65764583e92ede6705c7c81
 
 | Path | p50 | p95 | n |
 |---|---|---|---|
-| chat answer (first token = full verified turn) | 9 ms | 2710 ms | 112 |
-| report generation | 1552 ms | 24309 ms | 3 |
+| chat answer (first token = full verified turn) | 10 ms | 1438 ms | 112 |
+| report generation | 1597 ms | 14774 ms | 3 |
 
 Single-user timings with the mock LLM on the machine that ran the report, so they exclude model time; the load test (load/locustfile.py) has not been run against a deployed stack.
 

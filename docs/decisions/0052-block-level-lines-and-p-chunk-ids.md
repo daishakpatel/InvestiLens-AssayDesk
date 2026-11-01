@@ -23,11 +23,16 @@ different text: the silent failure ADR-0041 rules out.
 `vertical-align:super` / negative `top`) gets a space before it, so a footnote marker never joins
 a figure ("$111,905 2", not "$111,9052"). Proxy headings drop a leading enumerator or bullet
 before matching ("I. Summary compensation table", "•Advisory resolution…"). Text chunk IDs are
-`{document}_{item}_p{n}`; table chunk IDs (`{document}_{item}_{table_id}`) are unchanged. A 10-K
-or 10-Q with no item heading is sectioned by its own headings carrying standard item titles
-(`_TITLE_ITEMS` in `sections.py`), with a few non-item headings ("Key Terms") ending a section.
-Stored references made before v5 are remapped once by quote (`scripts/remap_chunk_ids.py`); one
-that cannot be matched keeps its old ID and resolves to not-found.
+`{document}_{item}_p{n}`; table chunk IDs stay `{document}_{item}_{table_id}`, so a table keeps
+its ID unless its section changes. A 10-K or 10-Q with no item heading is sectioned by its own
+headings carrying standard item titles (`_TITLE_ITEMS` in `sections.py`), with a few non-item
+headings ("Key Terms") ending a section; a 10-K whose Item 7 or 8 only points to an annual report
+bound in after the last item (JPM) is sectioned by that report's headings (`_BOUND_REPORT`).
+Stored references are remapped after a re-parse with `scripts/remap_chunk_ids.py` (snapshot →
+re-parse → apply): an unchanged chunk keeps its ID; otherwise the stored quote, then the chunk
+sharing the most of the old text, decides (chunks overlap, so the first chunk holding the old
+opening words can be the neighbour); a table that changed section is found by document and table
+number. One that cannot be matched keeps its old ID and resolves to not-found.
 
 ## Consequences
 

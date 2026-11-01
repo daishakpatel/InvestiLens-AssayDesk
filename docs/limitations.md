@@ -100,7 +100,6 @@ line when it is fixed.
 
 | Issue | Status | Area |
 |---|---|---|
-| JPMorgan filings parse into few or wrong sections (Intel fixed 2026-10-31) | Open | [10 — parsing](../Instructions/10_phase2a_document_parsing_chunking.md) |
 | Live-model eval (Recall@5, judge faithfulness, cost) not published | Open: needs a paid run | [21 — evaluation](../Instructions/21_phase5b_evaluation_framework.md) |
 | Load test never run against a deployed stack | Open | [22 — observability](../Instructions/22_phase5c_observability_and_security.md) |
 | Public demo not yet deployed | Open: ready, needs the owner's Render account | [37 — this phase](../Instructions/37_phase7l_measured_results_and_polish.md) |

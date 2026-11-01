@@ -24,24 +24,12 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ## 0. Broken right now
 
-- [ ] **Research reports cite chunks that no longer exist** (2026-10-31): Intel's latest report
-      (id 20) has all 34 chunk citations broken (its filings were re-sectioned 2026-10-29), and
-      every other report has 2–12 (earlier re-parses, or citations of "<p>"/"Table of Contents"
-      chunks the v5 parser no longer makes). They show as not found. Regenerating the five latest
-      reports (about $0.05–0.10 each) fixes it. `[code]`
-- [ ] **JPM's 10-K is mis-sectioned**: 1,523 of its 2,463 passages are labelled "Item 15. Exhibits",
-      because JPM binds its annual report (MD&A, financials) after that heading. Answers still work,
-      but section-aware features (management commentary, language tracking) miss it. `[code]`
 - [ ] **JPM's 10-Q has no Part I item headings** (cross-reference layout): its financial
       statements and MD&A are kept as one "Part I" section (`10q_part1_unitemized`) and flagged
       low-confidence, not split into Item 1 / Item 2. `[code]`
 
 ## 1. Decisions waiting on the project owner
 
-- [ ] **Main report/chat model.** With billing on, the free-tier cap on `gemini-3.8-flash` (20
-      requests a day) no longer binds. It wrote fuller reports than `gemini-3.5-flash-lite` (which
-      left revenue, profitability and management sections empty); measured about $0.05 per report
-      on either. Switching is one `.env` line: `LLM_MODEL_STRONG=gemini-3.8-flash`. `[code]`
 - [ ] **Commit** the uncommitted work listed above.
 - [ ] Product sign-off on AI budget placeholders ($5/user/month, $0.50 in demo, $25/day global). `[notes]`
 - [ ] Form 4 / 13F in scope or not (spec Appendix F #10). `[notes]`
@@ -50,10 +38,6 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ### AI answers and reports
 
-- [ ] **`gemini-3.5-flash-lite` is a weak main model**: it left revenue, profitability and
-      management sections empty where `gemini-3.8-flash` filled them, writes Markdown although told
-      not to (stripped before checking), and varies its citation syntax (the client normalises four
-      styles). `[code]`
 - [ ] **News summary is empty in every report**: news is still sample data. `[code]`
 - [ ] **Report sections search with fixed keywords and no preference for recent filings**
       (`_SECTION_QUERY` in `backend/app/research/report.py`): NVDA's bull case picked up crypto
@@ -522,3 +506,16 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   items, 18 red flags, 45 governance facts, 198 report sources, 90 brief citations, 24 pay facts;
   the unmatched ones cited junk chunks), red flags rescanned (no change), 10-K/10-Q/8-K chunks
   re-embedded (proxies and EX-99 releases stay unembedded, as before).
+- 2026-11-01 — **Reports regenerated, JPM's 10-K sectioned, citation remap corrected**: the five
+  latest research reports were regenerated with `gemini-3.8-flash` (now the `.env` model; ids
+  23–27, 79–124 s each, $0.57 in all, every chunk citation resolving). JPM's Items 7 and 8 only
+  point to the annual report bound in after Item 15, so that report's own headings now start Item 7
+  (MD&A), 9A and 8 (statements and notes), and its glossary ends them (`_BOUND_REPORT`, ADR-0052);
+  latest 10-K: Item 15 2,463 → 36 passages, MD&A 581, Item 8 1,019. The remap script first
+  matched a reference without a quote to the first chunk holding the old opening words, which,
+  with overlapping chunks, can be the previous chunk; it now keeps an unchanged ID, else picks
+  the chunk sharing the most old text, and finds a table whose section changed by its table number.
+  Every reference written by the 2026-10-31 remap was recomputed from the pre-v5 backup, and the
+  new reports' sources from their own JSON; 287 JPM proxy pay facts whose tables moved into the
+  v5 summary-compensation section resolve again. All 1,683 pay facts, 71 guidance items, 18 red
+  flags, 45 governance facts, 29 brief citations and the new reports' 166 chunk sources resolve.
