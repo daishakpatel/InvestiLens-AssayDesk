@@ -78,6 +78,14 @@ _BOUND_REPORT: list[tuple[re.Pattern[str], str]] = [
 ]
 _POINTER_BLOCKS = 5
 
+# A 10-Q that lists Part I's items only in its page-number table (JPM): MD&A opens with the
+# financial highlights, Item 1 with the first statement, and the glossary ends Item 1.
+_BOUND_QUARTER: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"consolidated financial highlights.*"), "P1-2"),
+    (re.compile(r"consolidated statements of income( \(unaudited\))?"), "P1-1"),
+    (re.compile(r"glossary of terms( and acronyms)?"), "0"),
+]
+
 # Core items used to score detection confidence.
 _CORE_10K = {"1", "1A", "2", "3", "5", "7", "7A", "8", "9A"}
 _CORE_10Q = {"P1-1", "P1-2"}  # financial statements + notes, and MD&A
@@ -118,7 +126,7 @@ def _layout_row(block: Block) -> str | None:
 
 
 def _item_heading(block: Block) -> tuple[str, str] | None:
-    text = _short_text(block)
+    text = _short_text(block) or _layout_row(block)  # AMD's 10-Q sets them as one-row tables
     match = _ITEM_RE.match(text) if text else None
     return (match.group(1).upper(), match.group(2).strip()) if match else None
 
@@ -253,9 +261,14 @@ def detect_sections(blocks: list[Block], filing_type: str) -> SectionResult:
         and starts[0][0] > 0
     ):
         # A cross-reference layout (JPM) lists Part I's items only in a page-number table, so
-        # its financial statements and MD&A carry no item heading. Keep them as one Part I
-        # section rather than drop them; the missing Item 1 still lowers the confidence.
-        starts.insert(0, (-1, f"P1-{WHOLE_DOCUMENT}", "Part I", "Financial information"))
+        # its financial statements and MD&A carry no item heading: their own headings start
+        # them. Text still before the first section (the cover, or all of Part I when those
+        # headings are missing) is one Part I section, never dropped; no Item 1 lowers confidence.
+        first = starts[0][0]
+        found = _titled_headings(blocks, filing_type, _BOUND_QUARTER)
+        starts = sorted(starts + [h for h in found if h[0] < first])
+        if starts[0][0] > 0:
+            starts.insert(0, (-1, f"P1-{WHOLE_DOCUMENT}", "Part I", "Financial information"))
     sections: list[Section] = []
     for position, (idx, code, label, title) in enumerate(starts):
         end = starts[position + 1][0] if position + 1 < len(starts) else len(blocks)

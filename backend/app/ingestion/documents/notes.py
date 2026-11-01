@@ -25,7 +25,7 @@ from typing import Any
 
 NOTE_TAXONOMY_VERSION = "note_taxonomy_v1"
 # Where the statements and notes live: 10-K Item 8, or Item 15 when the filer prints them after
-# the exhibit list (NVIDIA, JPMorgan); 10-Q Part I Item 1, or JPMorgan's unitemized Part I.
+# the exhibit list (NVIDIA, JPMorgan); 10-Q Part I Item 1, or an unitemized Part I (no headings).
 NOTES_SECTIONS = frozenset({"8", "15", "P1-1", "P1-0"})
 LOW_CONFIDENCE_MIN_NOTES = 5  # a 10-K with fewer notes was probably mis-segmented (FR-FN-001)
 
