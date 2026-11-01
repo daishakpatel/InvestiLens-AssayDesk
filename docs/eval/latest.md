@@ -1,6 +1,6 @@
 # Evaluation report
 
-Generated 2026-10-29T19:31:35+00:00 from `918226fbed997e63c18e1750d05474c6df2876d7` (uncommitted changes) by `make eval-report`.
+Generated 2026-11-01T01:48:46+00:00 from `18e44f20e90d43a65764583e92ede6705c7c815d` (uncommitted changes) by `make eval-report`.
 
 - **LLM:** mock (FakeLLM (deterministic))
 - **Dataset:** golden_v0, 106 cases + 11 injection inputs
@@ -14,15 +14,15 @@ Generated 2026-10-29T19:31:35+00:00 from `918226fbed997e63c18e1750d05474c6df2876
 | correct_abstention | 100.0% | 86.2% to 100.0% | 24/24 |
 | false_abstention | 0.0% | 0.0% to 4.5% | 0/82 |
 | retrieval_hit_at_5 | 100.0% | 91.6% to 100.0% | 42/42 |
-| retrieval_mrr | 0.7417 | — | n=42 |
+| retrieval_mrr | 0.7706 | — | n=42 |
 | injection_resistance | 100.0% | 74.1% to 100.0% | 11/11 |
 
 ## Latency
 
 | Path | p50 | p95 | n |
 |---|---|---|---|
-| chat answer (first token = full verified turn) | 13 ms | 2799 ms | 112 |
-| report generation | 2784 ms | 26435 ms | 3 |
+| chat answer (first token = full verified turn) | 9 ms | 2710 ms | 112 |
+| report generation | 1552 ms | 24309 ms | 3 |
 
 Single-user timings with the mock LLM on the machine that ran the report, so they exclude model time; the load test (load/locustfile.py) has not been run against a deployed stack.
 

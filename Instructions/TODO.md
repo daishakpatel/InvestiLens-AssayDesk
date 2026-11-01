@@ -24,9 +24,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ## 0. Broken right now
 
-- [ ] **Intel's filings have no sections**: its 10-K has no "Item N" headings (annual-report layout,
-      headings likely images), so it is kept as one flagged "Filing text" section. Chat and reports
-      work; section-aware features (management language, filing diff by section) do not. `[code]`
+- [ ] **Research reports cite chunks that no longer exist** (2026-10-31): Intel's latest report
+      (id 20) has all 34 chunk citations broken (its filings were re-sectioned 2026-10-29), and
+      every other report has 2–12 (earlier re-parses, or citations of "<p>"/"Table of Contents"
+      chunks the v5 parser no longer makes). They show as not found. Regenerating the five latest
+      reports (about $0.05–0.10 each) fixes it. `[code]`
 - [ ] **JPM's 10-K is mis-sectioned**: 1,523 of its 2,463 passages are labelled "Item 15. Exhibits",
       because JPM binds its annual report (MD&A, financials) after that heading. Answers still work,
       but section-aware features (management commentary, language tracking) miss it. `[code]`
@@ -192,15 +194,15 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       departures shows one flag (with all roles from the departure sentences); the second
       person's sentence is not quoted separately. `[code]`
 
-- [ ] **Footnotes leftovers** (Phase 7f, ADR-0044): notes under unnumbered bold headings
-      (Intel) are not segmented, so INTC has no notes (flagged low-confidence); JPM's FY
+- [ ] **Footnotes leftovers** (Phase 7f, ADR-0044): Intel's note headings are one-row tables
+      ("Note 1 :" | "Basis of Presentation"), not text, so INTC has no notes (flagged
+      low-confidence); JPM's FY
       `total_debt` holds short-term borrowings only, so its lease-adjusted debt understates; the
       last note runs to the end of its section (it absorbs NVIDIA's Schedule II / exhibit text);
       JPM note titles that wrap ("Off–balance sheet lending-related") keep the first line only and
-      fall to `other`; diff headings stop at "$" and page headers ("Notes to the Consolidated
-      Financial Statements") count as passages, because the parser splits inline-tagged figures
-      onto their own lines; quotes keep that layout ("$ 95.2 billion"). Summaries only for the
-      latest 10-K, not 10-Qs. `[code]`
+      fall to `other`; page headers ("Notes to the Consolidated Financial Statements") count as
+      passages. Summaries only for the latest 10-K, not 10-Qs; none are cached in the dev DB since
+      the v5 re-parse (`make footnote-summaries`, a few cents). `[code]`
 
 - [ ] **Governance leftovers** (Phase 7g, ADR-0045): board counts are often not stated in
       prose (Apple, JPMorgan give them only in nominee tables/graphics), so the independence
@@ -505,3 +507,18 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   carries `"x-unit": "ratio"` in its schema; the generic form labels it "Move threshold (%)",
   takes 5 for 0.05 (bounds checked in percent), sends the fraction, and lists rules as
   "Move threshold: 5%".
+- 2026-10-31 — **Parser v5 and Intel's sections** (ADR-0052): Intel's 10-Ks and 10-Qs (no "Item N"
+  headings) are sectioned by their own headings ("Risk Factors" → Item 1A, "Management's
+  Discussion and Analysis" → Item 7, …; the overview before "Our Business" is Item 1); FY2021–2023
+  10-Ks still open with a "Filing text" section (their business heading is only a page footer).
+  Two parser bugs fixed for every company: each table left literal "<p>"/"</p>" lines (about
+  7,100 chunks held nothing else), and lines broke between inline elements, so inline-XBRL
+  figures split sentences ("$ / 95.2 / billion") and notes chunks had a median of about 20
+  characters. Lines now break only at block elements; footnote superscripts (also JPM's CSS ones)
+  get a space so "$111,905" plus marker "2" is not "$111,9052"; proxy headings ignore a leading
+  "I." or bullet. Text chunk IDs end in `_p{n}` so no older ID can name other text. Dev DB: backed
+  up (`backups/assay-desk-20261101T014056Z.dump`), all 393 documents re-parsed (64,822 → 48,418
+  chunks), stored references remapped by quote with `scripts/remap_chunk_ids.py` (71 guidance
+  items, 18 red flags, 45 governance facts, 198 report sources, 90 brief citations, 24 pay facts;
+  the unmatched ones cited junk chunks), red flags rescanned (no change), 10-K/10-Q/8-K chunks
+  re-embedded (proxies and EX-99 releases stay unembedded, as before).

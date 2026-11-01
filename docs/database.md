@@ -189,12 +189,14 @@ EDGAR acceptance time), and `news`. A filing's `published_at` is also its accept
 | `note_summaries` | 10-K (Phase 7f) | cached `note_summary_v1` output keyed `{note_id}|{prompt_version}|{model}`; dropped on re-parse because it cites chunk IDs |
 
 `documents.parser_version` is NULL until the document is parsed, then the parser version that
-produced its chunks (`sec-ingest-v4` since Phase 7g: v3 starts a chunk at every note heading in
-the financial-statement sections, v4 splits proxy statements into keyword sections); the parse step skips documents already at it. A re-parse
+produced its chunks (`sec-ingest-v5` since 2026-10-31: v3 starts a chunk at every note heading in
+the financial-statement sections, v4 splits proxy statements into keyword sections, v5 breaks lines
+only at block elements and sections annual-report layouts by their own headings, ADR-0052); the parse step skips documents already at it. A re-parse
 replaces every chunk of the document, whatever its version, keeping the embedding of any chunk
-whose `content_hash` is unchanged. `document_chunks.paragraph_id` is `{document}_{item}_{n}`,
-where 8-K items are dotted (`5.02`) and 10-Q items part-qualified (`P1-1`), so a chunk ID from an
-older parse no longer resolves. `chunk_metadata.section_key` names the section independently of
+whose `content_hash` is unchanged. `document_chunks.paragraph_id` is `{document}_{item}_p{n}` for
+text (`_p` since v5) and `{document}_{item}_{table_id}` for tables, where 8-K items are dotted
+(`5.02`) and 10-Q items part-qualified (`P1-1`), so a text chunk ID from an older parse never
+resolves to other text. `chunk_metadata.section_key` names the section independently of
 its heading (`10q_part1_item1_notes`, `10k_item7`, `8k_item2.02`, `document`); exhibit chunks
 carry `filing_type` = the exhibit type (`EX-99.1`) and `tier` 2. No schema change.
 

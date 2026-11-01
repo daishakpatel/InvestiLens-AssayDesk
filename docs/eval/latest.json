@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-29T19:31:35+00:00",
-  "git_sha": "918226fbed997e63c18e1750d05474c6df2876d7",
+  "generated_at": "2026-11-01T01:48:46+00:00",
+  "git_sha": "18e44f20e90d43a65764583e92ede6705c7c815d",
   "dirty": true,
   "inputs_hash": "f62fac1ff7c6d23b0799e9f282df5e147662ccd76f871283985bb9dd9a43f6ed",
   "llm": {
@@ -69,7 +69,7 @@
       ]
     },
     "retrieval_mrr": {
-      "value": 0.7417,
+      "value": 0.7706,
       "n": 42
     },
     "injection_resistance": {
@@ -84,13 +84,13 @@
   },
   "latency": {
     "chat": {
-      "p50_ms": 13.0,
-      "p95_ms": 2799.0,
+      "p50_ms": 9.0,
+      "p95_ms": 2710.0,
       "n": 112
     },
     "report": {
-      "p50_ms": 2783.711291034706,
-      "p95_ms": 26434.83045801986,
+      "p50_ms": 1551.8595000030473,
+      "p95_ms": 24309.125625062734,
       "n": 3
     },
     "note": "Single-user timings with the mock LLM on the machine that ran the report, so they exclude model time; the load test (load/locustfile.py) has not been run against a deployed stack."
