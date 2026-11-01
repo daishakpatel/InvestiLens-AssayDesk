@@ -31,7 +31,8 @@ def linearize(tree: HTMLParser) -> list[Block]:
     extracted: list[ExtractedTable] = []
     for i, node in enumerate(tree.css("table")):
         extracted.append(extract_table(node, table_id=f"t{i:04d}"))
-        node.replace_with(f"<p>{_SENTINEL.format(i)}</p>")
+        # A bare token: selectolax inserts a string as text, so "<p>" here became literal text.
+        node.replace_with(_SENTINEL.format(i))
 
     body = tree.body or tree.root
     raw = body.text(separator="\n") if body is not None else ""

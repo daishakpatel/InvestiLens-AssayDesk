@@ -11,6 +11,10 @@ low-confidence parses can be flagged rather than trusted silently. Per form:
 - 8-K: full dotted codes ("5.02"), via `eightk_items`.
 - DEF 14A / DEFA14A: keyword headings (board, compensation tables, …), via `proxy_sections`.
 - anything else (an exhibit): the whole document is one section.
+
+A 10-K or 10-Q with no "Item N" heading at all (Intel's annual-report layout) is sectioned by its
+own headings instead, where they carry a standard item title ("Risk Factors", "Management's
+Discussion and Analysis"); a few non-item headings ("Key Terms") only end the section before them.
 """
 
 from __future__ import annotations
@@ -25,6 +29,44 @@ from app.ingestion.documents.eightk_items import parse_item_heading
 _ITEM_RE = re.compile(r"^item\s+(\d+[a-z]?)\b[.:)\s-]*(.*)$", re.I)
 _PART_RE = re.compile(r"^part\s+(ii|i|2|1)\b", re.I)
 _MAX_HEADING_CHARS = 200
+
+# Annual-report layouts: a heading's whole text → item code, per form. Matched on whole headings
+# only (never sentences), first occurrence: the table of contents is one table, not headings,
+# and later copies are page footers. Code "0" marks a non-item heading that only ends a section.
+# "Legal Proceedings" is left out: these layouts print it inside the contingencies note.
+_TITLE_ITEMS: dict[str, list[tuple[re.Pattern[str], str]]] = {
+    "10-K": [
+        (re.compile(r"(fundamentals of |introduction to )?(our )?business"), "1"),
+        (re.compile(r"risk factors"), "1A"),
+        (re.compile(r"cybersecurity"), "1C"),
+        (re.compile(r"properties"), "2"),
+        (re.compile(r"market for (our|the registrant's) common (stock|equity).*"), "5"),
+        (re.compile(r"management's discussion and analysis.*"), "7"),
+        (re.compile(r"quantitative and qualitative disclosures about market risk"), "7A"),
+        (re.compile(r"financial statements and (supplemental details|supplementary data)"), "8"),
+        (re.compile(r"controls and procedures"), "9A"),
+        (re.compile(r"exhibits( and financial statement schedules)?"), "15"),
+        (re.compile(r"other key information|information about our executive officers"), "0"),
+        (re.compile(r"key terms|form 10-k cross-reference index|signatures"), "0"),
+    ],
+    "10-Q": [
+        # The statements may have no group heading: the first statement's own title starts them.
+        (
+            re.compile(
+                r"consolidated condensed (financial statements|statements of (operations|income)).*"
+            ),
+            "P1-1",
+        ),
+        (re.compile(r"management's discussion and analysis.*"), "P1-2"),
+        (re.compile(r"quantitative and qualitative disclosures about market risk"), "P1-3"),
+        (re.compile(r"controls and procedures"), "P1-4"),
+        (re.compile(r"risk factors"), "P2-1A"),
+        (re.compile(r"issuer purchases of equity securities"), "P2-2"),
+        (re.compile(r"rule 10b5-1 trading arrangements|other information"), "P2-5"),
+        (re.compile(r"exhibits"), "P2-6"),
+        (re.compile(r"key terms|form 10-q cross-reference index|signatures"), "0"),
+    ],
+}
 
 # Core items used to score detection confidence.
 _CORE_10K = {"1", "1A", "2", "3", "5", "7", "7A", "8", "9A"}
@@ -105,6 +147,38 @@ def _candidates(blocks: list[Block], filing_type: str) -> list[tuple[int, str, s
     return out
 
 
+def _label(filing_type: str, code: str) -> str:
+    if filing_type.startswith("10-Q"):
+        part, item = code[1:].split("-", 1)
+        return f"Part {'I' if part == '1' else 'II'}, Item {item}"
+    return f"Item {code}"
+
+
+def _title_starts(blocks: list[Block], filing_type: str) -> list[tuple[int, str, str, str]]:
+    """(block index, code, label, title) for an annual-report layout's own headings."""
+    rules = _TITLE_ITEMS["10-Q" if filing_type.startswith("10-Q") else "10-K"]
+    seen: set[int] = set()  # each rule once: its first heading
+    out: list[tuple[int, str, str, str]] = []
+    for idx, block in enumerate(blocks):
+        raw = _short_text(block) or _layout_row(block)
+        if not raw:
+            continue
+        text = " ".join(raw.replace("\u2019", "'").lower().split()).rstrip(":.")
+        for rule, (pattern, code) in enumerate(rules):
+            if rule not in seen and pattern.fullmatch(text):
+                seen.add(rule)
+                label = raw.strip() if code == WHOLE_DOCUMENT else _label(filing_type, code)
+                out.append((idx, code, label, "" if code == WHOLE_DOCUMENT else raw.strip()))
+                break
+    if out and out[0][1] == "1":
+        # The overview and strategy printed before "Our Business" belong to Item 1; without
+        # this they would fall before the first section and be dropped.
+        out[0] = (-1, *out[0][1:])
+    elif out and out[0][0] > 0:
+        out.insert(0, (-1, WHOLE_DOCUMENT, "Filing text", ""))
+    return out
+
+
 def section_key(filing_type: str, code: str) -> str:
     """A stable section name, independent of the heading's wording."""
     if code == WHOLE_DOCUMENT:
@@ -136,6 +210,8 @@ def detect_sections(blocks: list[Block], filing_type: str) -> SectionResult:
             last_by_code[code] = (idx, label, title)
 
     starts = sorted((idx, code, label, title) for code, (idx, label, title) in last_by_code.items())
+    if not starts and filing_type.startswith(("10-K", "10-Q")):
+        starts = _title_starts(blocks, filing_type)
     if (
         filing_type.startswith("10-Q")
         and starts
@@ -155,9 +231,8 @@ def detect_sections(blocks: list[Block], filing_type: str) -> SectionResult:
         )
 
     if not sections and blocks:
-        # No "Item N" heading anywhere (an annual-report layout such as Intel's, or a document
-        # that has no items: a proxy statement, an exhibit): keep the whole document as one
-        # section rather than dropping it.
+        # No item heading and no item-titled heading (a document that has no items: a proxy
+        # statement, an exhibit): keep the whole document as one section rather than drop it.
         sections.append(
             Section(WHOLE_DOCUMENT, "Filing text", ["Filing text"], -1, len(blocks), "document")
         )
