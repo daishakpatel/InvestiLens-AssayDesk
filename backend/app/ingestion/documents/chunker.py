@@ -23,8 +23,10 @@ from app.ingestion.documents.tokens import estimate_tokens
 # parsed, on `documents.parser_version`, so up-to-date documents are skipped. v2: 8-K items are
 # full dotted codes and 10-Q items are part-qualified, which changes their chunk IDs. v3: every
 # financial-statement note starts its own chunk (Phase 7f, ADR-0044). v4: proxy statements are
-# split into keyword sections (Phase 7g, ADR-0045).
-PARSER_VERSION = "sec-ingest-v4"
+# split into keyword sections (Phase 7g, ADR-0045). v5: lines break only at block elements, so
+# inline-tagged figures stay in their sentence; text chunk IDs end in "_p{n}"; annual-report
+# layouts (Intel) are sectioned by their own headings (ADR-0052).
+PARSER_VERSION = "sec-ingest-v5"
 _TARGET_TOKENS = 400
 _MAX_TOKENS = 800
 _OVERLAP_MAX_TOKENS = 60  # ~15% of target: carry one small paragraph into the next chunk
@@ -108,7 +110,9 @@ class _ChunkBuilder:
         if not body.strip():
             return
         parent_id = f"{self.meta.document_id}_{section.item_code}"
-        paragraph_id = f"{parent_id}_{self.index}"  # deterministic (DP-006)
+        # Deterministic (DP-006). The "p" (since v5) keeps a new ID from ever equalling one issued
+        # by an older parse, so a stale citation fails as not found instead of naming other text.
+        paragraph_id = f"{parent_id}_p{self.index}"
         self.rows.append(
             {
                 "document_id": self.meta.document_id,

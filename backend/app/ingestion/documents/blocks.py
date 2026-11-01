@@ -17,6 +17,11 @@ from app.ingestion.documents.tables import ExtractedTable, extract_table
 # Null-free sentinel: the HTML parser strips \x00, so use an unlikely ASCII token instead.
 _SENTINEL = "zqztablezqz{}zqz"
 _SENTINEL_RE = re.compile(r"zqztablezqz(\d+)zqz")
+# Lines break only where the HTML starts a new block. Inline XBRL wraps each figure in its own
+# element, so breaking at every element split "was $ / 12.2 / billion" into three lines.
+_LINE_BREAK = "zqzbrzqz"
+_BLOCK_TAGS = "p,div,br,li,tr,h1,h2,h3,h4,h5,h6,section,article,ul,ol,dt,dd,blockquote,pre"
+_SUPERSCRIPT = 'sup, [style*="vertical-align:super"], [style*="top:-"]'
 
 
 @dataclass
@@ -34,8 +39,14 @@ def linearize(tree: HTMLParser) -> list[Block]:
         # A bare token: selectolax inserts a string as text, so "<p>" here became literal text.
         node.replace_with(_SENTINEL.format(i))
 
+    for node in tree.css(_BLOCK_TAGS):
+        node.insert_after(_LINE_BREAK)
+    # A footnote marker is not a digit of the figure: "$111,905 2", not "$111,9052". Filers raise
+    # it with <sup> or with CSS (JPM: "position:relative;top:-3.15pt").
+    for node in tree.css(_SUPERSCRIPT):
+        node.insert_before(" ")
     body = tree.body or tree.root
-    raw = body.text(separator="\n") if body is not None else ""
+    raw = body.text(separator="").replace(_LINE_BREAK, "\n") if body is not None else ""
 
     # Split on table sentinels (which can appear mid-line), keeping document order.
     blocks: list[Block] = []

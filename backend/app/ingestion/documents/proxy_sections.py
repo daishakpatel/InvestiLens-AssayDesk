@@ -59,11 +59,14 @@ RULES: tuple[tuple[str, str, re.Pattern[str]], ...] = (
     ),
 )
 SECTION_KEYS: tuple[str, ...] = tuple(key for key, _, _ in RULES)
+# A heading's own numbering or bullet ("I. Summary compensation table", "•Advisory resolution")
+# is not its title.
+_ENUMERATOR = re.compile(r"^([•▪●◦‣]\s*|\(?([ivx]+|\d+|[a-z])[.)]\s+)", re.I)
 
 
 def proxy_heading(block: Block) -> tuple[str, str] | None:
     """(key, code) if the block is a proxy section heading."""
-    text = block.text.strip()
+    text = _ENUMERATOR.sub("", block.text.strip())
     if block.kind != "text" or not text or len(text) > _MAX_HEADING_CHARS or text.endswith("."):
         return None
     if not text[0].isupper():
