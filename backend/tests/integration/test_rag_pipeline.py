@@ -32,7 +32,8 @@ from app.providers.mocks.embeddings import MockEmbeddingClient
 from app.rag import retrieval as retrieval_mod
 from app.rag.injection import OPEN_MARKER
 from app.rag.pipeline import run_retrieval
-from app.rag.types import Intent
+from app.rag.retrieval import retrieve_evidence
+from app.rag.types import Intent, RewrittenQuery, SearchScope
 
 _YEARS = [2023, 2024, 2025]
 _BOILER = "Our business is subject to general economic conditions and market volatility."
@@ -339,3 +340,25 @@ def test_risk_query_on_real_nvda_10k(
     joined = " ".join(e.text.lower() for e in result.evidence[:5])
     assert "supply" in joined or "risk" in joined
     assert any((e.section or "").lower().startswith("item 1a") for e in result.evidence)
+
+
+def test_scope_limits_sections_and_dates(session: Session, corpus: Company) -> None:  # RAG-013
+    # ADR-0053: a report section searches only its sections in filings since the latest 10-K, on
+    # both indexes (the vector search keeps scanning HNSW until enough rows pass the filter).
+    for chunk in session.scalars(
+        select(DocumentChunk).where(DocumentChunk.company_id == corpus.id)
+    ):
+        key = "10k_item7" if (chunk.section or "").startswith("Item 7") else "10k_item1a"
+        chunk.chunk_metadata = {**(chunk.chunk_metadata or {}), "section_key": key}
+    session.flush()
+
+    scope = SearchScope(frozenset({"10k_item7"}), date(2025, 1, 1))
+    outcome = retrieve_evidence(
+        session,
+        company_id=corpus.id,
+        rewritten=RewrittenQuery(original="supply chain risk", expanded="supply chain risk"),
+        scope=scope,
+    )
+    assert outcome.evidence, "the one in-scope chunk should be found"
+    assert all(e.section == "Item 7. MD&A" for e in outcome.evidence)
+    assert all(e.filing_date and e.filing_date >= date(2025, 1, 1) for e in outcome.evidence)
