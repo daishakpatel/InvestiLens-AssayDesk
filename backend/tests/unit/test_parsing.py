@@ -13,6 +13,7 @@ from app.ingestion.documents.drivers import is_driver_language
 from app.ingestion.documents.ixbrl import cross_check, extract_ixbrl_facts
 from app.ingestion.documents.normalize import normalize_text
 from app.ingestion.documents.sections import detect_sections
+from app.ingestion.documents.tables import ExtractedTable
 from app.ingestion.documents.tokens import estimate_tokens
 from app.providers.mocks._fixtures import fixture_gzip_bytes
 
@@ -127,9 +128,8 @@ def test_ixbrl_extraction_and_cross_check() -> None:
 
 
 def test_a_filing_without_item_headings_is_kept_as_one_section() -> None:  # DP-001, CH-001
-    # Intel's 10-K has no "Item 1A"/"Item 7" headings (it is laid out as an annual report with a
-    # cross-reference index at the back). Dropping it left Intel with no searchable text; it is
-    # now kept as one low-confidence section, flagged, so chat and reports can still cite it.
+    # No "Item N" heading and no heading with an item's title: kept as one low-confidence
+    # section, flagged, so chat and reports can still cite it rather than losing the text.
     blocks = [Block("text", f"Paragraph {i} about demand, supply and margins.") for i in range(6)]
     result = detect_sections(blocks, "10-K")
     assert result.low_confidence
@@ -140,3 +140,89 @@ def test_a_filing_without_item_headings_is_kept_as_one_section() -> None:  # DP-
     rows = chunk_filing(blocks, meta)
     assert rows and all(r["section"] == "Filing text" for r in rows)
     assert "Paragraph 0" in rows[0]["text"]
+
+
+def _heading_row(title: str) -> Block:
+    """A heading set as a one-row layout table, as Intel prints its section titles."""
+    return Block("table", table=ExtractedTable(table_id="t", rows=[[title, ""]]))
+
+
+def test_an_annual_report_layout_is_sectioned_by_its_own_headings() -> None:  # DP-001, FR-EX-012
+    # Intel's 10-K prints no "Item N" headings; its own headings carry the item titles, in its
+    # own order, and the overview before "Our Business" is part of Item 1.
+    blocks = [
+        Block("text", "Overview of our strategy and products."),
+        _heading_row("Our Business"),
+        Block("text", "We design and manufacture semiconductors."),
+        _heading_row("Management\u2019s Discussion and Analysis"),
+        Block("text", "Revenue was $52.9 billion in 2025."),
+        Block("text", "Quantitative and Qualitative Disclosures About Market Risk"),
+        Block("text", "We are exposed to currency risk."),
+        _heading_row("Risk Factors"),
+        Block("text", "Our foundry business may not succeed. See Risk Factors for more."),
+        _heading_row("Other Key Information"),
+        Block("text", "Information about our executive officers."),
+        Block("text", "Financial Statements and Supplemental Details"),
+        Block("text", "Legal Proceedings"),  # inside the contingencies note: not a section
+        Block("text", "We are party to various legal proceedings."),
+        _heading_row("Controls and Procedures"),
+        Block("text", "Our disclosure controls are effective."),
+        _heading_row("Exhibits"),
+        Block("text", "Exhibit 31.1"),
+    ]
+    result = detect_sections(blocks, "10-K")
+    assert [(s.key, s.start_idx) for s in result.sections] == [
+        ("10k_item1", -1),
+        ("10k_item7", 3),
+        ("10k_item7a", 5),
+        ("10k_item1a", 7),
+        ("document", 9),  # "Other Key Information" ends the risk factors, no item of its own
+        ("10k_item8", 11),
+        ("10k_item9a", 14),
+        ("10k_item15", 16),
+    ]
+    risk = result.sections[3]
+    assert risk.section_path == ["Item 1A"] and risk.end_idx == 9  # what the risk diff reads
+    meta = FilingMeta(
+        document_id=1, company_id=1, company_name="Intel", filing_type="10-K", period_label="FY2025"
+    )
+    rows = chunk_filing(blocks, meta)
+    assert (
+        "Overview of our strategy" in rows[0]["text"]
+        and rows[0]["section"] == "Item 1. Our Business"
+    )
+
+
+def test_a_quarterly_report_layout_is_sectioned_by_its_own_headings() -> None:  # DP-001, FR-EX-012
+    blocks = [
+        Block("text", "Forward-looking statements."),
+        _heading_row("Consolidated Condensed Statements of Income"),
+        Block("text", "Net revenue 13,284"),
+        _heading_row("Key Terms"),
+        _heading_row("Management\u2019s Discussion and Analysis (MD&A)"),
+        Block("text", "Revenue fell."),
+        Block("text", "Risk Factors"),
+        Block("text", "See our 2025 Form 10-K."),
+    ]
+    result = detect_sections(blocks, "10-Q")
+    assert [s.key for s in result.sections] == [
+        "document",  # the cover and forward-looking statements, before the statements
+        "10q_part1_item1_notes",
+        "document",
+        "10q_part1_item2",
+        "10q_part2_item1a",
+    ]
+    assert result.sections[-1].section_path == ["Part II, Item 1A"]
+    assert not result.low_confidence
+
+
+def test_tables_leave_no_markup_behind() -> None:  # DP-001
+    # Each table was swapped for "<p>sentinel</p>", which the parser inserts as literal text: every
+    # filing gained "<p>" and "</p>" lines, and in risk/notes sections each became its own chunk.
+    html = (
+        "<html><body><p>Revenue grew.</p><table><tr><td>Net revenue</td><td>13,284</td></tr>"
+        "</table><p>Margins fell.</p></body></html>"
+    )
+    blocks = linearize(clean_tree(html))
+    assert [b.kind for b in blocks] == ["text", "table", "text"]
+    assert all("<" not in b.text for b in blocks)

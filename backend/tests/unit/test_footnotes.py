@@ -358,7 +358,7 @@ def test_recorded_bad_response_keeps_only_verified_bullets() -> None:
     recorded = json.loads((_FIXTURES / "nvda_commitments_bad_summary.json").read_text())
     note, paragraphs = _nvda_commitments()
     result = _summarize(_ScriptedLLM(recorded["response"]), note, paragraphs)
-    assert [b.paragraph_id for b in result.bullets] == ["1_15_335", "1_15_336"]
+    assert [b.paragraph_id for b in result.bullets] == ["1_15_334", "1_15_335"]
     assert result.dropped == 3 and not result.abstain  # $120B, fabricated quote, unknown ID
     assert result.prompt_version == "note_summary_v1" and result.model == "mock"
 

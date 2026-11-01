@@ -232,7 +232,7 @@ def _extract(llm: LLMClient, paragraphs: list[tuple[str, str]]) -> Any:
 def test_recorded_bad_response_keeps_only_quoted_fields() -> None:
     recorded = json.loads((_FIXTURES / "nvda_bad_governance_response.json").read_text())
     paragraphs = tier_c.shown_paragraphs(_paragraphs("nvda"))
-    assert {"1_SOP_61", "1_IND_90", "1_COM_105"} <= {pid for pid, _ in paragraphs}
+    assert {"1_SOP_59", "1_IND_87", "1_COM_102"} <= {pid for pid, _ in paragraphs}
     result = _extract(_Scripted(recorded["response"]), paragraphs)
     fields = result["fields"]
     assert fields["board_size"]["value"] == "10"
