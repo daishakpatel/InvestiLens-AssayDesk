@@ -24,9 +24,8 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ## 0. Broken right now
 
-- [ ] **JPM's 10-Q has no Part I item headings** (cross-reference layout): its financial
-      statements and MD&A are kept as one "Part I" section (`10q_part1_unitemized`) and flagged
-      low-confidence, not split into Item 1 / Item 2. `[code]`
+- [x] **JPM's 10-Q has no Part I item headings** (cross-reference layout): fixed 2026-11-01, see
+      "Done". AMD's 10-Qs had the same symptom (item headings set as one-row tables), also fixed.
 
 ## 1. Decisions waiting on the project owner
 
@@ -276,6 +275,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [ ] Definition of Done checkboxes in task files `01`–`25` were never ticked (every box is
       `[ ]`), although each phase was handed off as done. `UI_plan/` steps are ticked. `[code]`
 
+- [ ] Older reports (ids 9–22), their chat messages and claim verifications still cite 10-Q
+      chunk IDs from before part-qualified codes (`{doc}_1A_{n}`, ADR-0041); they resolve to
+      not-found. Current reports (23–27) are clean. Delete or regenerate the old ones. `[code]`
+
 ## Done since the audit
 
 - 2026-10-12 — **CI green**: an "offline" contract test needed a seeded database; the guard test
@@ -519,3 +522,12 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   new reports' sources from their own JSON; 287 JPM proxy pay facts whose tables moved into the
   v5 summary-compensation section resolve again. All 1,683 pay facts, 71 guidance items, 18 red
   flags, 45 governance facts, 29 brief citations and the new reports' 166 chunk sources resolve.
+- 2026-11-01 — **JPM's and AMD's 10-Qs sectioned** (ADR-0052): every stored 10-Q of both scored 0
+  section confidence, with all of Part I in one unitemized section. JPM names Part I's items only
+  in its page-number table, so its own headings now start them (`_BOUND_QUARTER`: financial
+  highlights → MD&A, first statement → Item 1, glossary ends it); AMD sets item headings as
+  one-row tables, which now count, as 8-K headings already did. No 10-K and no other company's
+  10-Q changed (dry run over all 70 stored 10-Ks/10-Qs). Dev DB: backed up
+  (`backups/assay-desk-20261101T183538Z.dump`, snapshot `chunks-v5-pre-10q-20261101.json`), the 18
+  documents re-parsed by clearing `parser_version` (no version bump), stored references remapped
+  with none unmatched, new chunks embedded.

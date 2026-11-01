@@ -28,6 +28,13 @@ its ID unless its section changes. A 10-K or 10-Q with no item heading is sectio
 headings carrying standard item titles (`_TITLE_ITEMS` in `sections.py`), with a few non-item
 headings ("Key Terms") ending a section; a 10-K whose Item 7 or 8 only points to an annual report
 bound in after the last item (JPM) is sectioned by that report's headings (`_BOUND_REPORT`).
+A 10-Q with Part II items but no Part I item heading (JPM names them only in its page-number
+table) is sectioned the same way (`_BOUND_QUARTER`): "Consolidated financial highlights" starts
+MD&A, the first statement starts Item 1, and the glossary ends it; text before them stays one
+unitemized Part I section. Item headings set as one-row layout tables (AMD's 10-Qs) count as
+headings, as 8-K headings already did. These two changes alter only JPM's and AMD's 10-Qs, so
+`PARSER_VERSION` was not bumped: those 18 documents were re-parsed by clearing their
+`parser_version`, with the same snapshot → re-parse → apply remap.
 Stored references are remapped after a re-parse with `scripts/remap_chunk_ids.py` (snapshot →
 re-parse → apply): an unchanged chunk keeps its ID; otherwise the stored quote, then the chunk
 sharing the most of the old text, decides (chunks overlap, so the first chunk holding the old

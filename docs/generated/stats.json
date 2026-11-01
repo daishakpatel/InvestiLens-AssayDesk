@@ -1,17 +1,17 @@
 {
   "generated_by": "make stats",
   "tests": {
-    "backend": 803,
+    "backend": 806,
     "frontend": 149,
     "e2e": 93,
-    "total": 1045
+    "total": 1048
   },
   "endpoints": 92,
   "adrs": 52,
   "seed_companies": 3,
   "loc": {
-    "backend_app": 31082,
-    "backend_tests": 16030,
+    "backend_app": 31094,
+    "backend_tests": 16070,
     "frontend_src": 25603,
     "e2e": 2741,
     "scripts": 2882

@@ -29,9 +29,10 @@ that can be checked against the code or the eval report, not a disclaimer. Updat
 - Banks get no gross margin, inventory turnover or similar industrial ratios. These are marked
   "not applicable" by sector rules (DR-042). Bank-specific measures (net interest margin, CET1)
   are not computed.
-- Some filings parse poorly. Intel's 10-K has no "Item N" headings and gets no sections.
-  JPMorgan's 10-K and 10-Q use a cross-reference layout, and most of its passages are mis-labelled.
-  Search and filing diffs are weaker for those two companies.
+- Some filings parse imperfectly. Intel's filings have no "Item N" headings and are sectioned by
+  their own titles; its FY2021–2023 10-Ks still open with an unlabelled "Filing text" section.
+  JPMorgan's 10-K and 10-Q name their items only in a cross-reference table and are sectioned by
+  the report's own headings, a rule written for its current layout.
 - Guidance is read only from ingested earnings releases (EX-99.1). An outlook laid out as a
   table (Intel's) is not extracted.
 
