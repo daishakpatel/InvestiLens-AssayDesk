@@ -29,6 +29,16 @@ class Intent(StrEnum):
 
 
 @dataclass(frozen=True)
+class SearchScope:
+    """Limits a search to some sections (`chunk_metadata.section_key`) and to filings on or after
+    a date. Report sections use it so old filings, proxies and press-release boilerplate stay out
+    (ADR-0053)."""
+
+    section_keys: frozenset[str] = frozenset()  # empty = any section
+    filed_since: date | None = None
+
+
+@dataclass(frozen=True)
 class IntentResult:
     intent: Intent
     confidence: float

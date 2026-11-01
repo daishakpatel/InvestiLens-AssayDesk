@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Float, Text, cast, func, select, text
+from sqlalchemy import ColumnElement, Float, Text, cast, func, select, text
 from sqlalchemy.dialects.postgresql import TSQUERY
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,7 @@ from app.config import get_settings
 from app.models import DocumentChunk
 from app.providers import get_embedding_client
 from app.providers.base import EmbeddingClient
+from app.rag.types import SearchScope
 
 
 @dataclass
@@ -33,6 +34,17 @@ class SearchHit:
     score: float  # cosine similarity (vector) or ts_rank_cd (keyword); non-financial, float is fine
     text: str
     section: str | None
+
+
+def _scope_filters(scope: SearchScope | None) -> list[ColumnElement[bool]]:
+    if scope is None:
+        return []
+    out: list[ColumnElement[bool]] = []
+    if scope.section_keys:
+        out.append(DocumentChunk.chunk_metadata["section_key"].astext.in_(scope.section_keys))
+    if scope.filed_since is not None:
+        out.append(DocumentChunk.filing_date >= scope.filed_since)
+    return out
 
 
 def _query_vector(query: str, client: EmbeddingClient) -> list[float]:
@@ -48,6 +60,7 @@ def vector_search(
     limit: int = 40,
     client: EmbeddingClient | None = None,
     ef_search: int | None = None,
+    scope: SearchScope | None = None,
 ) -> list[SearchHit]:
     """Semantic (cosine) search over the HNSW index, company-scoped (RAG-013)."""
     client = client or get_embedding_client()
@@ -58,6 +71,7 @@ def vector_search(
         limit=limit,
         ef_search=ef_search,
         model=client.model_name,
+        scope=scope,
     )
 
 
@@ -69,6 +83,7 @@ def vector_search_by_vector(
     limit: int = 40,
     ef_search: int | None = None,
     model: str | None = None,
+    scope: SearchScope | None = None,
 ) -> list[SearchHit]:
     """Cosine search for a pre-computed query vector (lets tests pin exact vectors offline).
 
@@ -79,6 +94,11 @@ def vector_search_by_vector(
     # ef_search tunes HNSW recall at query time (EMB-004); LOCAL = scoped to this transaction.
     # SET takes no bind params, so the value is inlined — safe because it is a validated int.
     session.execute(text(f"SET LOCAL hnsw.ef_search = {ef}"))
+    filters = _scope_filters(scope)
+    if filters:
+        # A filter applied after the index scan can leave fewer than `limit` rows; pgvector >= 0.8
+        # keeps scanning until enough rows pass (ADR-0053).
+        session.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
     distance = DocumentChunk.embedding.cosine_distance(list(vector))
     rows = session.execute(
         select(
@@ -88,6 +108,7 @@ def vector_search_by_vector(
             DocumentChunk.company_id == company_id,
             DocumentChunk.embedding.is_not(None),
             *([DocumentChunk.embedding_model == model] if model is not None else []),
+            *filters,
         )
         .order_by(distance)
         .limit(limit)
@@ -96,7 +117,12 @@ def vector_search_by_vector(
 
 
 def keyword_search(
-    session: Session, *, query: str, company_id: int, limit: int = 40
+    session: Session,
+    *,
+    query: str,
+    company_id: int,
+    limit: int = 40,
+    scope: SearchScope | None = None,
 ) -> list[SearchHit]:
     """Full-text keyword search over the GIN-indexed `tsv` column, company-scoped (RAG-010).
 
@@ -108,12 +134,17 @@ def keyword_search(
     any_word = cast(
         func.replace(cast(func.plainto_tsquery("english", query), Text), "&", "|"), TSQUERY
     )
+    filters = _scope_filters(scope)
     rows: Sequence[Any] = []
     for tsquery in (strict, any_word):
         rank = func.ts_rank_cd(DocumentChunk.tsv, tsquery, type_=Float)
         rows = session.execute(
             select(DocumentChunk.id, rank.label("rank"), DocumentChunk.text, DocumentChunk.section)
-            .where(DocumentChunk.company_id == company_id, DocumentChunk.tsv.op("@@")(tsquery))
+            .where(
+                DocumentChunk.company_id == company_id,
+                DocumentChunk.tsv.op("@@")(tsquery),
+                *filters,
+            )
             .order_by(rank.desc())
             .limit(limit)
         ).all()

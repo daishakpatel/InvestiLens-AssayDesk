@@ -12,12 +12,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any, get_args
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.billing.budget import check_budget
@@ -25,11 +27,11 @@ from app.citation.evidence import EvidenceItem
 from app.citation.pipeline import persist as persist_claims
 from app.config import Settings, get_settings
 from app.filings.service import change_statuses, llm_adjudicator
-from app.models import Company
+from app.models import Company, DocumentChunk
 from app.providers import get_llm_client
 from app.providers.base import LLMClient
 from app.rag.retrieval import retrieve_evidence
-from app.rag.types import RewrittenQuery
+from app.rag.types import RewrittenQuery, SearchScope
 from app.repositories import companies as company_repo
 from app.repositories import news as news_repo
 from app.repositories import reports as report_repo
@@ -76,6 +78,30 @@ _SECTION_QUERY: dict[str, str] = {
     "management_commentary": "management outlook guidance strategy",
     "factors": "growth risks competition outlook margins demand",
 }
+# Where each section's evidence comes from (ADR-0053): MD&A, risk factors or the business
+# description, never proxies or press-release boilerplate. Filings before the latest 10-K are
+# left out too, so a risk the company has since dropped (NVIDIA's crypto mining) is not cited.
+_MDNA = frozenset({"10k_item7", "10q_part1_item2"})
+_RISK = frozenset({"10k_item1a", "10q_part2_item1a"})
+_BUSINESS = frozenset({"10k_item1"})
+# A safe-harbor disclaimer says nothing about the business but matches "outlook" queries well.
+_DISCLAIMER = re.compile(
+    r"(contains?|include|includes)\s+forward-looking statements|"
+    r"forward-looking statements within the meaning",
+    re.I,
+)
+_SECTION_SCOPE: dict[str, frozenset[str]] = {
+    "executive_summary": _MDNA | _BUSINESS,
+    "company_overview": _BUSINESS | _MDNA,
+    "revenue_analysis": _MDNA,
+    "profitability_analysis": _MDNA,
+    "balance_sheet_analysis": _MDNA,
+    "cash_flow_analysis": _MDNA,
+    "valuation_analysis": _MDNA,
+    "risks": _RISK,
+    "management_commentary": _MDNA,
+    "factors": _RISK | _MDNA,
+}
 
 
 @dataclass
@@ -89,17 +115,39 @@ def _rewrite(query: str) -> RewrittenQuery:
     return RewrittenQuery(original=query, expanded=query)
 
 
+def _latest_10k_date(session: Session, company_id: int) -> date | None:
+    return session.scalar(
+        select(func.max(DocumentChunk.filing_date)).where(
+            DocumentChunk.company_id == company_id, DocumentChunk.filing_type == "10-K"
+        )
+    )
+
+
 def _retrieve(
-    session: Session, company_id: int, query: str, *, settings: Settings
+    session: Session,
+    company_id: int,
+    section: str,
+    *,
+    settings: Settings,
+    since: date | None = None,
 ) -> list[EvidenceItem]:
+    query = _SECTION_QUERY[section]
+    scope = SearchScope(_SECTION_SCOPE[section], since)
+    rewritten = _rewrite(query)
     try:
         outcome = retrieve_evidence(
-            session, company_id=company_id, rewritten=_rewrite(query), settings=settings
+            session, company_id=company_id, rewritten=rewritten, settings=settings, scope=scope
         )
+        if not outcome.evidence:
+            # Sections not labelled (an unusual layout): any passage beats none. Logged.
+            log_event(logger, logging.WARNING, "report.retrieve.unscoped", section=section)
+            outcome = retrieve_evidence(
+                session, company_id=company_id, rewritten=rewritten, settings=settings
+            )
     except Exception as exc:  # retrieval failure must not sink the report
         log_event(logger, logging.WARNING, "report.retrieve.failed", query=query, error=str(exc))
         return []
-    return [from_rag(e) for e in outcome.evidence]
+    return [from_rag(e) for e in outcome.evidence if not _DISCLAIMER.search(e.text)]
 
 
 def _news_evidence(session: Session, company_id: int, *, settings: Settings) -> list[EvidenceItem]:
@@ -194,21 +242,18 @@ def generate_report(
         for c in gen.verified.citations:
             citations.setdefault(c.source_id, c)
 
+    since = _latest_10k_date(session, company.id)
     for section in _PROSE_SECTIONS:
         payload, metric_ev = build_payload(session, company.id, section)
-        chunks = _retrieve(session, company.id, _SECTION_QUERY[section], settings=settings)
+        chunks = _retrieve(session, company.id, section, settings=settings, since=since)
         record(section, [*metric_ev, *chunks], payload)
 
-    record("risks", _retrieve(session, company.id, _SECTION_QUERY["risks"], settings=settings), {})
-    record(
-        "management_commentary",
-        _retrieve(session, company.id, _SECTION_QUERY["management_commentary"], settings=settings),
-        {},
-    )
+    for section in ("risks", "management_commentary"):
+        record(section, _retrieve(session, company.id, section, settings=settings, since=since), {})
     record("news_summary", _news_evidence(session, company.id, settings=settings), {})
 
     # Bull and bear draw from the SAME evidence pool so they cannot cherry-pick facts (§10.12-13).
-    shared_pool = _retrieve(session, company.id, _SECTION_QUERY["factors"], settings=settings)
+    shared_pool = _retrieve(session, company.id, "factors", settings=settings, since=since)
     record("bull_factors", shared_pool, {})
     record("bear_factors", shared_pool, {})
 

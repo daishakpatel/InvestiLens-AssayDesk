@@ -21,7 +21,7 @@ from app.rag.evidence import build_evidence
 from app.rag.fusion import reciprocal_rank_fusion
 from app.rag.rerank import get_reranker
 from app.rag.search import keyword_search, vector_search
-from app.rag.types import Evidence, RewrittenQuery
+from app.rag.types import Evidence, RewrittenQuery, SearchScope
 from app.repositories import chunks as chunk_repo
 from app.utils.logging import get_logger, log_event
 
@@ -146,6 +146,7 @@ def retrieve_evidence(
     company_id: int,
     rewritten: RewrittenQuery,
     settings: Settings | None = None,
+    scope: SearchScope | None = None,
 ) -> RetrievalOutcome:
     """Run the full document retrieval + ranking pipeline for one company (RAG-010…018)."""
     settings = settings or get_settings()
@@ -156,7 +157,9 @@ def retrieve_evidence(
     ranked_lists: list[list[int]] = []
     for q in queries:
         try:
-            semantic = vector_search(session, query=q, company_id=company_id, limit=top_n)
+            semantic = vector_search(
+                session, query=q, company_id=company_id, limit=top_n, scope=scope
+            )
         except Exception as exc:  # embedding provider down or over quota: keyword search carries on
             log_event(logger, logging.WARNING, "rag.vector_search.failed", error=str(exc))
             semantic = []
@@ -164,7 +167,9 @@ def retrieve_evidence(
         ranked_lists.append(
             [
                 h.chunk_id
-                for h in keyword_search(session, query=q, company_id=company_id, limit=top_n)
+                for h in keyword_search(
+                    session, query=q, company_id=company_id, limit=top_n, scope=scope
+                )
             ]
         )
 
