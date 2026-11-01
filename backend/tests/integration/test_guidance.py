@@ -90,7 +90,7 @@ class _Recorded(LLMClient):
     ) -> dict[str, Any]:
         self.calls += 1
         pid = messages[1].content.split("[paragraph_id=", 1)[1].split("]", 1)[0]
-        recorded = _RECORDED.read_text().replace('"1_0_5"', json.dumps(pid))
+        recorded = _RECORDED.read_text().replace('"1_0_p5"', json.dumps(pid))
         response: dict[str, Any] = json.loads(recorded)["response"]
         return response
 

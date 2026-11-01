@@ -226,3 +226,21 @@ def test_tables_leave_no_markup_behind() -> None:  # DP-001
     blocks = linearize(clean_tree(html))
     assert [b.kind for b in blocks] == ["text", "table", "text"]
     assert all("<" not in b.text for b in blocks)
+
+
+def test_inline_tagged_figures_stay_in_their_sentence() -> None:  # DP-001, FR-FN-001
+    # Inline XBRL wraps each figure in its own element; breaking lines at every element turned
+    # "were $95.2 billion" into three lines, and in the notes each line became its own chunk.
+    html = (
+        "<html><body><div><span>These commitments were $</span><ix:nonFraction>95.2"
+        "</ix:nonFraction><span> billion.</span></div>"
+        "<div>The median employee was $111,905<sup>2</sup>, a ratio of 363 to 1.</div>"
+        '<div>The CEO was paid $40,644,723<span style="position:relative;top:-3pt">1</span>.</div>'
+        "</body></html>"
+    )
+    texts = [b.text for b in linearize(clean_tree(html))]
+    assert texts == [
+        "These commitments were $95.2 billion.",
+        "The median employee was $111,905 2, a ratio of 363 to 1.",
+        "The CEO was paid $40,644,723 1.",
+    ]

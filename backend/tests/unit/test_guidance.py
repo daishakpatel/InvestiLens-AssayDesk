@@ -61,7 +61,7 @@ def _recorded() -> dict[str, Any]:
 # --- FR-GD-003 outlook only ---------------------------------------------------------------------
 def test_model_sees_only_the_outlook_sentences() -> None:
     sections = _sections()
-    assert len(sections) == 1 and list(sections[0].shown) == ["1_0_5"]
+    assert len(sections) == 1 and list(sections[0].shown) == ["1_0_p5"]
     system, user = extract.build_messages(sections)
     assert system.content == extract.SYSTEM_PROMPT
     assert "Revenue is expected to be $108.0 billion, plus or minus 2%." in user.content

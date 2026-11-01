@@ -30,7 +30,7 @@ Once it is up, start at `/demo` for three guided paths.
 ## Measured results
 
 <!-- generated:results -->
-Mock-LLM run of 106 golden questions on 2026-10-29 ([full report](docs/eval/latest.md), with what it does not cover).
+Mock-LLM run of 106 golden questions on 2026-11-01 ([full report](docs/eval/latest.md), with what it does not cover).
 
 | Metric | Measured | Wilson interval | n |
 |---|---|---|---|
@@ -77,7 +77,7 @@ make up && make seed                   # Postgres, Redis, API, workers, frontend
 
 `make check` runs lint, types, tests and the docs-consistency gate.
 <!-- generated:stats -->
-793 backend and 149 frontend test functions, 93 Playwright tests, 92 API operations and 51 ADRs ([generated](docs/generated/stats.json)).
+800 backend and 149 frontend test functions, 93 Playwright tests, 92 API operations and 52 ADRs ([generated](docs/generated/stats.json)).
 <!-- /generated:stats -->
 
 ## Limits and method

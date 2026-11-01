@@ -83,11 +83,12 @@ def test_jpm_10k_has_34_notes() -> None:
 
 
 def test_every_note_starts_its_own_chunk_with_its_title() -> None:
-    """The chunker breaks at each note heading and keeps "Note 11 -" with its title line."""
+    """The chunker breaks at each note heading and keeps "Note 11 -" with its title (one line
+    since v5, which no longer breaks lines between inline elements)."""
     rows = {r["paragraph_id"]: r for r in _rows("nvda")}
     segmentation = segment_notes(_rows("nvda"), filing_type="10-K")
     debt = next(n for n in segmentation.notes if n.category == "debt")
-    assert rows[debt.paragraph_ids[0]]["text"].startswith("Note 11 -\n\nDebt")
+    assert rows[debt.paragraph_ids[0]]["text"].startswith("Note 11 - Debt")
     # No chunk of the note before it reaches into the debt note.
     previous = segmentation.notes[segmentation.notes.index(debt) - 1]
     assert all("Note 11 -" not in rows[pid]["text"] for pid in previous.paragraph_ids)
@@ -358,7 +359,7 @@ def test_recorded_bad_response_keeps_only_verified_bullets() -> None:
     recorded = json.loads((_FIXTURES / "nvda_commitments_bad_summary.json").read_text())
     note, paragraphs = _nvda_commitments()
     result = _summarize(_ScriptedLLM(recorded["response"]), note, paragraphs)
-    assert [b.paragraph_id for b in result.bullets] == ["1_15_334", "1_15_335"]
+    assert [b.paragraph_id for b in result.bullets] == ["1_15_p246", "1_15_p247"]
     assert result.dropped == 3 and not result.abstain  # $120B, fabricated quote, unknown ID
     assert result.prompt_version == "note_summary_v1" and result.model == "mock"
 
@@ -366,7 +367,7 @@ def test_recorded_bad_response_keeps_only_verified_bullets() -> None:
 def test_no_surviving_bullet_abstains() -> None:
     note, paragraphs = _nvda_commitments()
     fabricated = {"bullets": [{"text": "x", "quote": "never said this in the filing at all",
-                               "paragraph_id": "1_15_335"}], "abstain": False}  # fmt: skip
+                               "paragraph_id": "1_15_p247"}], "abstain": False}  # fmt: skip
     result = _summarize(_ScriptedLLM(fabricated), note, paragraphs)
     assert result.abstain and result.bullets == [] and result.dropped == 1
     assert _summarize(_ScriptedLLM({"bullets": [], "abstain": True}), note, paragraphs).abstain
