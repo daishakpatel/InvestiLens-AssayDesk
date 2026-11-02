@@ -104,10 +104,12 @@ _RULES: list[tuple[Intent, re.Pattern[str], str]] = [
 ]
 
 # Pure metric lookups: a known metric word + a value-seeking verb, and NOT a why/how question.
+# No bare "price": stock-price questions are caught before this (ADR-0054), and "average price
+# paid per share" (buybacks) belongs to the filings.
 _METRIC_TERMS = re.compile(
     r"\b(revenue|sales|net income|earnings|eps|gross margin|operating margin|net margin|"
     r"ebitda|free cash flow|fcf|operating income|debt|cash|current ratio|roe|roa|"
-    r"market cap|p/?e|price|margin|gross profit|inventory turnover)\b",
+    r"market cap|p/?e|margins?|gross profit|inventory turnover)\b",
     re.IGNORECASE,
 )
 _METRIC_ASK = re.compile(
@@ -116,6 +118,8 @@ _METRIC_ASK = re.compile(
     re.IGNORECASE,
 )
 _WHY_HOW = re.compile(r"\b(why|how (did|has|have)|drove|caused|explain)\b", re.IGNORECASE)
+# "What did management say about margins?" asks for commentary, not the stored figure.
+_SAID = re.compile(r"\b(say|said|says|saying|comment\w*|discuss\w*|management)\b", re.IGNORECASE)
 
 
 def classify_intent(question: str) -> IntentResult:
@@ -131,7 +135,8 @@ def classify_intent(question: str) -> IntentResult:
         return IntentResult(Intent.OUT_OF_SCOPE, 0.9, "forecast")
 
     # Pure metric lookup wins over the generic patterns, but never over a why/how explanation.
-    if _METRIC_TERMS.search(q) and _METRIC_ASK.search(q) and not _WHY_HOW.search(q):
+    metric_ask = _METRIC_TERMS.search(q) and _METRIC_ASK.search(q)
+    if metric_ask and not _WHY_HOW.search(q) and not _SAID.search(q):
         return IntentResult(Intent.FINANCIAL_METRIC, 0.9, "metric-lookup")
 
     for intent, pattern, rule in _RULES:

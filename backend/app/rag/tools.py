@@ -224,9 +224,13 @@ _REGISTRY: dict[str, Callable[..., dict[str, Any]]] = {
 class ToolRunner:
     """Dispatches tool calls under a budget + loop guard + timeout, logging each with latency."""
 
-    def __init__(self, session: Session, *, settings: Settings | None = None) -> None:
+    def __init__(
+        self, session: Session, *, settings: Settings | None = None, max_calls: int | None = None
+    ) -> None:
         self._session = session
         self._settings = settings or get_settings()
+        # The budget guards a model choosing calls; a fixed, deterministic plan passes its size.
+        self._max_calls = max_calls or self._settings.rag_max_tool_calls
         self._calls = 0
         self._seen: dict[tuple[str, str], int] = {}
         self.log: list[ToolCallLog] = []
@@ -234,10 +238,8 @@ class ToolRunner:
     def call(self, name: str, **args: Any) -> dict[str, Any]:
         if name not in _REGISTRY:
             raise ToolError(f"unknown tool: {name!r}")
-        if self._calls >= self._settings.rag_max_tool_calls:
-            raise ToolBudgetExceeded(
-                f"tool-call budget {self._settings.rag_max_tool_calls} exceeded"
-            )
+        if self._calls >= self._max_calls:
+            raise ToolBudgetExceeded(f"tool-call budget {self._max_calls} exceeded")
         signature = (name, repr(sorted(args.items())))
         self._seen[signature] = self._seen.get(signature, 0) + 1
         if self._seen[signature] > 2:  # same call ≥3 times = a loop
