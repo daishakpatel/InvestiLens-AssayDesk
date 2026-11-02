@@ -108,7 +108,11 @@ assembled context block, and a `sufficient` flag. It **generates no answer** —
    "gross profit percentage"), resolve relative time ("last three years" → fiscal years via
    `fiscal_calendars`), decompose explanation questions into sub-queries.
 3. **Routing** (RAG-030) — `FINANCIAL_METRIC` is answered from `financial_metrics` (Phase 1c) via
-   the tool layer, **never** through vector/keyword search.
+   the tool layer, **never** through vector/keyword search. A stock-price question ("stock high on
+   Sep 29", "share price today"; `prices.py`) is answered first, from the stored daily bar on or
+   before the asked day, cited `price:<TICKER>:<date>` (ADR-0054). Plain "margins" asks for gross,
+   operating and net margin; a "trend" with no stated period covers the last five fiscal years.
+   "What did management say about X" is commentary, never a metric lookup.
 4. **Retrieval** (`retrieval.py`, RAG-010…018) — vector + keyword search over the rewritten query
    and its sub-queries → **RRF fusion** (`fusion.py`, k=60) → **boilerplate dedup** (keep the
    latest of a `dedup_hash` cluster, annotate "unchanged since") → **rerank** (`rerank.py`) →

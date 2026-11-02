@@ -240,8 +240,8 @@ a single digest notification.
 
 **Notifications** add `ticker`, `event_type`, `severity` (`info|warning|critical`) and
 `source_ids`: backend-issued evidence ids the client links to — `filing:<filing id>`,
-`news:<news id>`, `price:<TICKER>:<from>:<to>`, or filing chunk ids. `filing:` and `price:` ids
-are not (yet) resolvable through `GET /sources/{id}`.
+`news:<news id>`, `price:<TICKER>:<from>:<to>`, or filing chunk ids. `price:` ids resolve through
+`GET /sources/{id}` to a `price_bar` source (ADR-0054); `filing:` ids are not (yet) resolvable.
 
 ### Admin (internal)
 | Method | Path |

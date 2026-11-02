@@ -3689,6 +3689,35 @@ export interface components {
             /** Metrics */
             metrics?: string[] | null;
         };
+        /**
+         * PriceBarSource
+         * @description End-of-day market data: one trading day (`price:{TICKER}:{date}`) or two
+         *     (`price:{TICKER}:{date}:{end_date}`), ADR-0054.
+         */
+        PriceBarSource: {
+            /** Date */
+            date: string;
+            /** End Date */
+            end_date?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Source Id */
+            source_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source_type: "price_bar";
+            /** Ticker */
+            ticker: string;
+            /**
+             * Tier
+             * @description Source-quality tier (§15)
+             */
+            tier: number;
+            /** Url */
+            url?: string | null;
+        };
         /** PricePoint */
         PricePoint: {
             /** Adj Close */
@@ -4091,7 +4120,7 @@ export interface components {
                 [key: string]: string;
             }[];
             /** Source */
-            source: components["schemas"]["TextChunkSource"] | components["schemas"]["TableChunkSource"] | components["schemas"]["XbrlFactSource"] | components["schemas"]["DerivedMetricSource"] | components["schemas"]["NewsItemSource"] | components["schemas"]["EarningsReleaseSource"];
+            source: components["schemas"]["TextChunkSource"] | components["schemas"]["TableChunkSource"] | components["schemas"]["XbrlFactSource"] | components["schemas"]["DerivedMetricSource"] | components["schemas"]["NewsItemSource"] | components["schemas"]["PriceBarSource"] | components["schemas"]["EarningsReleaseSource"];
             /** Text */
             text?: string | null;
         };

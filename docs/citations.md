@@ -58,6 +58,7 @@ deep link; derived metrics also return lineage inputs, CIT-003). Id scheme:
 | prefix / shape | type |
 |----------------|------|
 | `news:<id>` | news_item |
+| `price:<TICKER>:<date>` or `price:<TICKER>:<date>:<end_date>` | price_bar (Tier 4): that trading day's open/high/low/close/volume, or the two days' closes, as reported by the provider; exact trading days only (ADR-0054) |
 | `xbrl:<TICKER>:<metric>:FY<year>` | xbrl_fact: a base metric from `financial_metrics`, one ID per metric and period (ADR-0034) |
 | `derived:<TICKER>:<name>:<period>` | derived_metric: a ratio or a derived Q4 value, with lineage |
 | `xbrl:<fact_id>` (integer) | xbrl_fact: a raw `financial_facts` row |

@@ -6594,6 +6594,77 @@
         "title": "PortfolioRequest",
         "type": "object"
       },
+      "PriceBarSource": {
+        "description": "End-of-day market data: one trading day (`price:{TICKER}:{date}`) or two\n(`price:{TICKER}:{date}:{end_date}`), ADR-0054.",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_type": {
+            "const": "price_bar",
+            "default": "price_bar",
+            "title": "Source Type",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "tier": {
+            "description": "Source-quality tier (\u00a715)",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Tier",
+            "type": "integer"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "source_id",
+          "tier",
+          "ticker",
+          "date"
+        ],
+        "title": "PriceBarSource",
+        "type": "object"
+      },
       "PricePoint": {
         "properties": {
           "adj_close": {
@@ -7771,6 +7842,7 @@
                 "derived_metric": "#/components/schemas/DerivedMetricSource",
                 "earnings_release": "#/components/schemas/EarningsReleaseSource",
                 "news_item": "#/components/schemas/NewsItemSource",
+                "price_bar": "#/components/schemas/PriceBarSource",
                 "table_chunk": "#/components/schemas/TableChunkSource",
                 "text_chunk": "#/components/schemas/TextChunkSource",
                 "transcript": "#/components/schemas/EarningsReleaseSource",
@@ -7793,6 +7865,9 @@
               },
               {
                 "$ref": "#/components/schemas/NewsItemSource"
+              },
+              {
+                "$ref": "#/components/schemas/PriceBarSource"
               },
               {
                 "$ref": "#/components/schemas/EarningsReleaseSource"
