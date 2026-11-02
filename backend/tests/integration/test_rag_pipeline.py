@@ -26,6 +26,7 @@ from app.models import (
     DocumentChunk,
     FinancialMetric,
     FiscalCalendar,
+    PriceHistory,
     RetrievalLog,
 )
 from app.providers.mocks.embeddings import MockEmbeddingClient
@@ -362,3 +363,27 @@ def test_scope_limits_sections_and_dates(session: Session, corpus: Company) -> N
     assert outcome.evidence, "the one in-scope chunk should be found"
     assert all(e.section == "Item 7. MD&A" for e in outcome.evidence)
     assert all(e.filing_date and e.filing_date >= date(2025, 1, 1) for e in outcome.evidence)
+
+
+def test_price_question_is_answered_from_daily_bars(
+    session: Session, corpus: Company, monkeypatch: pytest.MonkeyPatch
+) -> None:  # RAG-030, ADR-0054
+    def _boom(*_a: object, **_k: object) -> list:  # type: ignore[type-arg]
+        raise AssertionError("a stock-price question must not search documents")
+
+    monkeypatch.setattr(retrieval_mod, "vector_search", _boom)
+    monkeypatch.setattr(retrieval_mod, "keyword_search", _boom)
+    for day in (date(2026, 9, 25), date(2026, 9, 29)):  # no bar on Saturday the 26th
+        session.add(
+            PriceHistory(company_id=corpus.id, date=day, close=Decimal("100"), provider="t")
+        )
+    session.flush()
+
+    weekend = run_retrieval(
+        session, question="What did the stock close at on Sep 26?", ticker="TST"
+    )
+    assert weekend.structured_source_ids == ["price:TST:2026-09-25"]  # the last trading day before
+    latest = run_retrieval(session, question="stock price today", ticker="TST")
+    assert latest.structured_source_ids == ["price:TST:2026-09-29"] and latest.sufficient
+    before = run_retrieval(session, question="the stock price on 2001-01-02", ticker="TST")
+    assert not before.sufficient and before.abstain_reason == "no_price_data"

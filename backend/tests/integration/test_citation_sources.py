@@ -8,7 +8,7 @@ that verification outcomes persist to `claim_verifications` with reason codes (C
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -31,6 +31,7 @@ from app.models import (
     FinancialFact,
     FinancialMetric,
     News,
+    PriceHistory,
     ResearchReport,
 )
 from app.schemas.sources import TextChunkSource
@@ -228,3 +229,38 @@ def test_verifications_persist_with_reason_codes(session: Session, seeded: dict[
     reasons = {r.reason_code for r in rows}
     assert "UNKNOWN_SOURCE" in reasons  # the ghost-cited claim logged with its reason (CIT-005 L6)
     assert any(r.status == "accepted" for r in rows)
+
+
+def test_price_ids_resolve_to_market_data(session: Session) -> None:  # CIT-006, ADR-0054
+    # One trading day (chat answers, valuations) and two (alerts, earnings reactions); exact days
+    # only, so a weekend or a malformed ID is not-found rather than another day's price.
+    company = Company(ticker="PRC", cik="0000000011", name="Price Corp")
+    session.add(company)
+    session.flush()
+    for day, close in ((date(2026, 9, 28), "227.21"), (date(2026, 9, 29), "230.5")):
+        session.add(
+            PriceHistory(
+                company_id=company.id,
+                date=day,
+                open=Decimal("230.97"),
+                high=Decimal("232.82"),
+                low=Decimal("227.03"),
+                close=Decimal(close),
+                volume=101494933,
+                provider="tiingo",
+            )
+        )
+    session.flush()
+
+    one = resolve_source(session, "price:PRC:2026-09-28")
+    assert one is not None and one.source.source_type == "price_bar" and one.source.tier == 4
+    assert one.text == (
+        "PRC on 2026-09-28: opened at $230.97, high $232.82, low $227.03, closed at $227.21; "
+        "volume 101,494,933 shares (Tiingo end-of-day data)"
+    )
+    two = resolve_source(session, "price:PRC:2026-09-28:2026-09-29")
+    assert two is not None and two.text == (
+        "PRC closed at $227.21 on 2026-09-28 and $230.50 on 2026-09-29 (Tiingo end-of-day data)"
+    )
+    for missing in ("price:PRC:2026-09-27", "price:PRC:not-a-date", "price:NOPE:2026-09-28"):
+        assert resolve_source(session, missing) is None
