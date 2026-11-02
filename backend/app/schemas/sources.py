@@ -18,6 +18,7 @@ SourceType = Literal[
     "xbrl_fact",
     "derived_metric",
     "news_item",
+    "price_bar",
     "earnings_release",
     "transcript",
 ]
@@ -75,6 +76,17 @@ class NewsItemSource(_SourceBase):
     excerpt_span: str | None = None
 
 
+class PriceBarSource(_SourceBase):
+    """End-of-day market data: one trading day (`price:{TICKER}:{date}`) or two
+    (`price:{TICKER}:{date}:{end_date}`), ADR-0054."""
+
+    source_type: Literal["price_bar"] = "price_bar"
+    ticker: str
+    date: str  # ISO-8601 trading day
+    end_date: str | None = None
+    provider: str | None = None
+
+
 class EarningsReleaseSource(_SourceBase):
     """Earnings release or transcript (transcripts add `speaker`)."""
 
@@ -92,6 +104,7 @@ SourceRecord = Annotated[
     | XbrlFactSource
     | DerivedMetricSource
     | NewsItemSource
+    | PriceBarSource
     | EarningsReleaseSource,
     Field(discriminator="source_type"),
 ]

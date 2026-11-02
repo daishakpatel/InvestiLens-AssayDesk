@@ -23,6 +23,7 @@ _TYPE_TIER: dict[str, int] = {
     # Tier 4 — licensed/reputable news.
     "news_item": 4,
     "news": 4,
+    "price_bar": 4,  # licensed end-of-day market data (ADR-0054)
 }
 
 MIN_TIER = 1

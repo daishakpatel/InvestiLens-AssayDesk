@@ -35,6 +35,16 @@ def get_price_history(
     )
 
 
+def bar_on_or_before(session: Session, *, company_id: int, day: date) -> PriceHistory | None:
+    """The trading day's bar, or the last one before it (a weekend or holiday), or None."""
+    return session.scalar(
+        select(PriceHistory)
+        .where(PriceHistory.company_id == company_id, PriceHistory.date <= day)
+        .order_by(PriceHistory.date.desc())
+        .limit(1)
+    )
+
+
 def upsert_price_bars(session: Session, company_id: int, bars: list[dict[str, Any]]) -> int:
     """Upsert daily bars by (company_id, date). Returns the number of rows written."""
     if not bars:

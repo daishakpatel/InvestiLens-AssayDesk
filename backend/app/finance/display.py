@@ -88,6 +88,11 @@ def format_metric_value(value: Decimal | None, unit: str | None, *, metric: str 
     return f"{_trim(value)} {unit or ''}".strip()
 
 
+def format_price(value: Decimal) -> str:
+    """A share price, always to the cent: 182.1 → "$182.10"."""
+    return f"${value.quantize(_CENT, rounding=ROUND_HALF_UP):,f}"
+
+
 def metric_label(name: str) -> str:
     return _LABELS.get(name) or name.replace("_", " ").capitalize()
 

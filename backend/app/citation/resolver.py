@@ -7,17 +7,29 @@ document-chunk anchor as the default) keeps resolution unambiguous:
 - ``derived:…`` (or a `financial_metrics.source_id` match) → derived_metric (with lineage, CIT-003)
 - ``redflag:<TICKER>:<rule>:<accession>`` → the flag's quoted filing text as a text_chunk, with
   the filing as the deep link (Phase 7e, FR-RF-008)
+- ``price:<TICKER>:<date>[:<end_date>]`` → price_bar: that trading day's bar, or two days' closes
+  (ADR-0054)
 - otherwise the id is a chunk ``paragraph_id`` → text_chunk / table_chunk, or earnings_release /
   transcript when the parent document is one.
 """
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.finance.display import describe_metric
-from app.models import Document, DocumentChunk, FinancialFact, FinancialMetric, News
+from app.finance.display import describe_metric, format_price
+from app.models import (
+    Company,
+    Document,
+    DocumentChunk,
+    FinancialFact,
+    FinancialMetric,
+    News,
+    PriceHistory,
+)
 from app.redflags import taxonomy
 from app.repositories import red_flags as red_flag_repo
 from app.schemas.citations import SourceDetail
@@ -25,6 +37,7 @@ from app.schemas.sources import (
     DerivedMetricSource,
     EarningsReleaseSource,
     NewsItemSource,
+    PriceBarSource,
     TableChunkSource,
     TextChunkSource,
     XbrlFactSource,
@@ -147,6 +160,8 @@ def resolve_source(session: Session, source_id: str) -> SourceDetail | None:
         return _news(row) if row else None
     if source_id.startswith(taxonomy.SOURCE_PREFIX):
         return _red_flag(session, source_id)
+    if source_id.startswith("price:"):
+        return _price(session, source_id)
     # A canonical metric's own source_id (base or derived) resolves first — its scheme may itself
     # start with "xbrl:"/"derived:", so this precedes the raw-fact prefix branch below.
     metric = session.scalar(
@@ -161,6 +176,66 @@ def resolve_source(session: Session, source_id: str) -> SourceDetail | None:
         return _xbrl(fact) if fact else None
     chunk = session.scalar(select(DocumentChunk).where(DocumentChunk.paragraph_id == source_id))
     return _chunk(session, chunk) if chunk else None
+
+
+def _bar_text(ticker: str, bar: PriceHistory) -> str:
+    """One trading day, every field the provider gave, as the sentence a chat answer quotes."""
+    parts = [
+        f"{label} {format_price(value)}"
+        for label, value in (
+            ("opened at", bar.open),
+            ("high", bar.high),
+            ("low", bar.low),
+            ("closed at", bar.close),
+        )
+        if value is not None
+    ]
+    volume = f"; volume {bar.volume:,} shares" if bar.volume is not None else ""
+    return f"{ticker} on {bar.date.isoformat()}: {', '.join(parts)}{volume}"
+
+
+def _price(session: Session, source_id: str) -> SourceDetail | None:
+    """`price:TICKER:DATE` (one bar) or `price:TICKER:DATE:END` (two closes); exact days only."""
+    parts = source_id.split(":")
+    if len(parts) not in (3, 4):
+        return None
+    try:
+        days = [date.fromisoformat(d) for d in parts[2:]]
+    except ValueError:
+        return None
+    company = session.scalar(select(Company).where(Company.ticker == parts[1].upper()))
+    if company is None:
+        return None
+    bars = [
+        session.scalar(
+            select(PriceHistory).where(
+                PriceHistory.company_id == company.id, PriceHistory.date == day
+            )
+        )
+        for day in days
+    ]
+    found = [b for b in bars if b is not None]
+    if len(found) != len(days):
+        return None
+    provider = found[0].provider.capitalize() if found[0].provider else "Market"
+    if len(found) == 1:
+        text = _bar_text(company.ticker, found[0])
+    else:
+        closes = [format_price(b.close) if b.close is not None else "n/a" for b in found]
+        text = (
+            f"{company.ticker} closed at {closes[0]} on {days[0].isoformat()} "
+            f"and {closes[1]} on {days[1].isoformat()}"
+        )
+    source = PriceBarSource(
+        source_id=source_id,
+        tier=4,
+        ticker=company.ticker,
+        date=days[0].isoformat(),
+        end_date=days[1].isoformat() if len(days) == 2 else None,
+        provider=found[0].provider,
+    )
+    # Tier 4 claims are framed as reported by the outlet (spec §15).
+    return SourceDetail(source=source, text=f"{text} ({provider} end-of-day data)")
 
 
 def _red_flag(session: Session, source_id: str) -> SourceDetail | None:
