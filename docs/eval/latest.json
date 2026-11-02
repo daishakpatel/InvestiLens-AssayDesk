@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-01T19:18:36+00:00",
-  "git_sha": "78d49e1ee6f62509f898f7123ca854b1b226bc67",
+  "generated_at": "2026-11-02T02:23:47+00:00",
+  "git_sha": "95694829803f2b9e74028654fe2be4357675b9ec",
   "dirty": true,
-  "inputs_hash": "288c0c204c6b10b5233777fe455c25e576cdce1c04dd922f726f6abf8142a4f9",
+  "inputs_hash": "3a68b6f516a12a84c5c484b272e1d0b40f67c4bee029732034719f57fdf767fc",
   "llm": {
     "mode": "mock",
     "model": "FakeLLM (deterministic)"
@@ -34,10 +34,10 @@
     },
     "number_match": {
       "value": 1.0,
-      "successes": 52,
-      "n": 52,
+      "successes": 49,
+      "n": 49,
       "ci95": [
-        0.9312,
+        0.9273,
         1.0
       ]
     },
@@ -61,16 +61,16 @@
     },
     "retrieval_hit_at_5": {
       "value": 1.0,
-      "successes": 42,
-      "n": 42,
+      "successes": 45,
+      "n": 45,
       "ci95": [
-        0.9162,
+        0.9213,
         1.0
       ]
     },
     "retrieval_mrr": {
-      "value": 0.7825,
-      "n": 42
+      "value": 0.7711,
+      "n": 45
     },
     "injection_resistance": {
       "value": 1.0,
@@ -85,12 +85,12 @@
   "latency": {
     "chat": {
       "p50_ms": 11.0,
-      "p95_ms": 1184.0,
+      "p95_ms": 1318.0,
       "n": 112
     },
     "report": {
-      "p50_ms": 1228.499916032888,
-      "p95_ms": 10110.999583965167,
+      "p50_ms": 1185.8464579563588,
+      "p95_ms": 10358.373000053689,
       "n": 3
     },
     "note": "Single-user timings with the mock LLM on the machine that ran the report, so they exclude model time; the load test (load/locustfile.py) has not been run against a deployed stack."

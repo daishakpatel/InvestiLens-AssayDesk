@@ -41,10 +41,7 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [x] **Report sections search with fixed keywords and no preference for recent filings**:
       fixed 2026-11-01 (ADR-0053), see "Done". The queries are still fixed keywords, but each
       section now searches only its own filing sections, latest 10-K onward. `[code]`
-- [ ] **Price questions go to document search**: "what was the stock high on Sep 29" or "stock price
-      today" are not answered from `price_history` (prices have no citable source type yet). One
-      such question sent 23k tokens of context, well over the 6,000-token budget. Plain "margins"
-      is not in the metric lexicon, so "how did margins trend?" goes to the filings. `[code]`
+- [x] **Price questions go to document search**: fixed 2026-11-01 (ADR-0054), see "Done".
 - [ ] **Report speed**: about 70 s on `gemini-3.5-flash-lite` (18 calls), 171 s on `gemini-3.8-flash`
       with free-tier pacing, against a 90 s target (NFR-003). `LLM_RATE_LIMIT_PER_SEC` (0.25) can be
       raised now that billing is on. `[code]`
@@ -114,9 +111,9 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       notifications, `/alerts` settings page. `[code]` / `[notes]`
 - [ ] Email: no delivery provider for verify-email / password-reset; `email_verified_at` gates
       nothing; SMTP backend unproven. `[code]` / `[notes]`
-- [ ] Alerts (Phase 7a leftovers): `filing:<id>` / `price:…` evidence ids don't resolve via
-      `GET /sources/{id}` (the UI maps them to routes); email is sent before the dispatch job
-      commits, so a crash in that window can resend one (ADR-0039); `price_move` checks only the
+- [ ] Alerts (Phase 7a leftovers): `filing:<id>` evidence ids don't resolve via
+      `GET /sources/{id}` (the UI maps them to routes; `price:` ids resolve since ADR-0054);
+      email is sent before the dispatch job commits, so a crash in that window can resend one (ADR-0039); `price_move` checks only the
       newest bar per company. `[code]`
 
 ### Report-level features (§10.16)
@@ -538,3 +535,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   business description from the latest 10-K onward, with an unscoped fallback when nothing is in
   scope; safe-harbor disclaimers are dropped. Scoped vector search uses `hnsw.iterative_scan`
   (pgvector >= 0.8; check the hosted version before deploying).
+- 2026-11-01 — **Price questions answered from stored prices** (ADR-0054): a new `price_bar`
+  source resolves `price:<TICKER>:<date>[:<end_date>]` from `price_history` (Tier 4, provider
+  named), so chat answers "stock high on Sep 29" / "stock price today" from the bar on or before
+  that day with a deterministic, cited sentence, and alert/earnings price links resolve. Plain
+  "margins" asks for gross/operating/net margin, a "trend" with no period covers five fiscal years,
+  "what did management say about X" is no longer a metric lookup (golden q_0059/63/67 now route as
+  labelled), and a deterministic structured answer sizes its own tool budget (a five-year revenue
+  trend needed 9 calls against the budget of 6 and raised).
