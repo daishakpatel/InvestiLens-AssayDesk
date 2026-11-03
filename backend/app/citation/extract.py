@@ -11,7 +11,11 @@ import re
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
-MARKER = re.compile(r"\[SOURCE:\s*([^\]]+?)\s*\]", re.IGNORECASE)
+# Models also write `[source_id=a, source_id=b]`, `[cite: a; b]` and a bare `[news:12]`.
+_LABEL = r"(?:source_id|source|cite)\s*[:=]\s*"
+_BARE_ID = r"(?=(?:news|xbrl|derived|price|redflag):\S)"
+MARKER = re.compile(rf"\[(?:{_LABEL}|{_BARE_ID})([^\]]+?)\s*\]", re.IGNORECASE)
+_ID_LABEL = re.compile(rf"^{_LABEL}", re.IGNORECASE)
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9$])")
 
 _SCALES = {
@@ -75,9 +79,10 @@ def strip_markers(text: str) -> tuple[str, list[str]]:
     """Return (text without markers, source_ids in first-appearance order, de-duplicated)."""
     ids: list[str] = []
     for m in MARKER.finditer(text):
-        sid = m.group(1).strip()
-        if sid and sid not in ids:
-            ids.append(sid)
+        for part in re.split(r"[,;]", m.group(1)):
+            sid = _ID_LABEL.sub("", part.strip())
+            if sid and sid not in ids:
+                ids.append(sid)
     cleaned = MARKER.sub("", text)
     cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
     cleaned = re.sub(r"\s+([.,;%])", r"\1", cleaned)  # tidy space left before punctuation

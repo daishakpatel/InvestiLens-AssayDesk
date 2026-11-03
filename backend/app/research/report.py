@@ -17,6 +17,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any, get_args
 
 from sqlalchemy import func, select
@@ -152,7 +153,13 @@ def _retrieve(
 
 def _news_evidence(session: Session, company_id: int, *, settings: Settings) -> list[EvidenceItem]:
     since = news_repo.recent_since(settings.news_backfill_days, now=datetime.now(UTC))
-    rows = news_repo.get_recent_news(session, company_id=company_id, since=since, limit=20)
+    rows = news_repo.list_news(
+        session,
+        company_id=company_id,
+        from_dt=since,
+        min_relevance=Decimal(str(settings.news_relevance_threshold)),
+        limit=20,
+    )
     items: list[EvidenceItem] = []
     for row in rows:
         source = NewsItemSource(

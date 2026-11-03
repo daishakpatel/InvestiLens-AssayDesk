@@ -19,6 +19,7 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.billing.budget import BudgetExceededError
+from app.config import get_settings
 from app.embeddings.pipeline import embed_pending
 from app.models import (
     ClaimVerification,
@@ -35,7 +36,7 @@ from app.models import (
 from app.providers.mocks.embeddings import MockEmbeddingClient
 from app.research.payloads import build_payload
 from app.research.prompts import REPORT_PROMPT_VERSION
-from app.research.report import generate_report
+from app.research.report import _news_evidence, generate_report
 from tests.fakes import FakeLLM
 
 _CHUNKS = [
@@ -141,11 +142,32 @@ def _seed_company(session: Session, ticker: str, *, gross_margin: str | None) ->
             url="https://news/1",
             publisher="Reuters",
             published_at=datetime.now(UTC),
+            relevance_score=Decimal("0.9"),
         )
     )
     session.flush()
     embed_pending(session, client=MockEmbeddingClient())
     return company
+
+
+def test_news_evidence_leaves_out_passing_mentions(session: Session) -> None:
+    """§10.8, FR-020: a report summarizes the same news the News tab shows, not market stories."""
+    company = _seed_company(session, "NWS", gross_margin="0.70")
+    session.add(
+        News(
+            company_id=company.id,
+            title="Treasury market suffers a historic sell-off",
+            url="https://news/2",
+            publisher="Reuters",
+            published_at=datetime.now(UTC),
+            relevance_score=Decimal("0.1"),
+        )
+    )
+    session.flush()
+    evidence = _news_evidence(session, company.id, settings=get_settings())
+    assert [item.text.split(" Data center")[0] for item in evidence] == [
+        "Analyst upgrade on AI demand"
+    ]
 
 
 def test_full_report_generates_and_persists(session: Session) -> None:

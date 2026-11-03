@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from app.billing.cost import estimate_cost
 from app.citation.entailment import Entailer, get_entailer
 from app.citation.evidence import EvidenceItem, index_evidence
-from app.citation.extract import RawClaim
+from app.citation.extract import RawClaim, strip_markers
 from app.citation.pipeline import verify_claims
 from app.config import Settings, get_settings
 from app.ingestion.documents.tokens import estimate_tokens
@@ -253,10 +253,12 @@ def generate_section(
     raw = _call(llm, messages, _schema(section), section, session=session, user_id=user_id)
     items = _extract(section, raw)
 
-    raw_claims = [
-        RawClaim(claim_id=f"{section}_{i}", text=it.text, source_ids=it.source_ids)
-        for i, it in enumerate(items)
-    ]
+    raw_claims = []
+    for i, it in enumerate(items):
+        text, marked = strip_markers(it.text)
+        if text:  # the index in claim_id maps a claim back to its item, so it is not renumbered
+            ids = list(dict.fromkeys([*it.source_ids, *marked]))
+            raw_claims.append(RawClaim(claim_id=f"{section}_{i}", text=text, source_ids=ids))
     verified = verify_claims(raw_claims, ev_index, settings=settings, entailer=entailer)
     accepted = [c for c in verified.claims if c.status in ("accepted", "softened")]
     return SectionGeneration(items=items, verified=verified, insufficient=not accepted)

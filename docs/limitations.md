@@ -18,9 +18,6 @@ The open-work list behind it is [`Instructions/TODO.md`](../Instructions/TODO.md
   development database. The fixtures, the eval report and the public demo still use synthetic
   headlines. A news run fails for a company when its embedding call fails, as NVIDIA's and
   Apple's latest runs did (2026-10-30).
-- Report news summaries are empty, even with real news. The model writes markers such as
-  `[news:4009]` or `[source_id=news:4009]` inside its sentences, the number check reads 4009 as a
-  figure, and the sentence is rejected as `NUMERIC_MISMATCH`.
 - Fiscal periods are taken from each filing's own dates, never inferred from calendar dates. A
   company with an unusual fiscal year (NVIDIA ends in late January) is labelled by its fiscal
   year, which can read as "a year ahead" of the calendar.
@@ -109,7 +106,6 @@ line when it is fixed.
 | Live-model eval (Recall@5, judge faithfulness, cost) not published | Open: needs a paid run | [21 — evaluation](../Instructions/21_phase5b_evaluation_framework.md) |
 | Load test never run against a deployed stack | Open | [22 — observability](../Instructions/22_phase5c_observability_and_security.md) |
 | Public demo not yet deployed | Open: ready, needs the owner's Render account | [37 — this phase](../Instructions/37_phase7l_measured_results_and_polish.md) |
-| Report news summaries are empty: inline source markers fail the number check | Open | [09 — news](../Instructions/09_phase1e_news_ingestion.md) |
 | No email delivery for verification and password reset | Open | [17 — auth](../Instructions/17_phase4b_auth_and_users.md) |
 
 ## How I'd validate this with a real analyst

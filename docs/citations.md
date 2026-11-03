@@ -10,6 +10,9 @@ generates nothing itself. Sources: spec §13 (citations), §14 (hallucination/co
 - `verify_text(text, evidence)` — split prose with `[SOURCE:id]` markers into claims, verify each,
   render numbered citations.
 - `verify_claims(raw_claims, evidence)` — same, for already-segmented structured claims (3b).
+  Reports call `strip_markers` on each item first, because models also write markers inside JSON
+  text. `strip_markers` reads `[SOURCE:a]`, `[source_id=a, source_id=b]`, `[cite: a; b]` and a bare
+  ID with a known prefix (`[news:12]`); the IDs are then checked like any other.
 - `persist(session, output, report_id=|chat_message_id=)` — log every claim to
   `claim_verifications` (CIT-005 L6).
 

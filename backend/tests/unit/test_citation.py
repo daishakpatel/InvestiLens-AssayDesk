@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+
 from app.citation.confidence import score_claim
 from app.citation.evidence import EvidenceItem, index_evidence
 from app.citation.extract import extract_numbers, has_factual_content, split_claims, strip_markers
@@ -44,6 +46,28 @@ def test_strip_markers_collects_ids_in_order() -> None:
     cleaned, ids = strip_markers("Revenue rose [SOURCE:a] and margin fell [SOURCE:b].")
     assert ids == ["a", "b"]
     assert "[SOURCE" not in cleaned and cleaned.startswith("Revenue")
+
+
+@pytest.mark.parametrize(
+    ("marker", "ids"),
+    [
+        ("[news:4009]", ["news:4009"]),
+        ("[source_id=news:4009]", ["news:4009"]),
+        ("[source_id=1_2_3, source_id=1_2_4]", ["1_2_3", "1_2_4"]),
+        ("[cite: a; b]", ["a", "b"]),
+        ("[news:1, news:2]", ["news:1", "news:2"]),
+    ],
+)
+def test_strip_markers_reads_the_forms_models_write(marker: str, ids: list[str]) -> None:
+    """CIT-001: real report claims carried these inside JSON text (2026-11-01)."""
+    cleaned, found = strip_markers(f"Treasuries sold off {marker}.")
+    assert found == ids
+    assert cleaned == "Treasuries sold off."
+
+
+def test_strip_markers_leaves_ordinary_brackets() -> None:
+    text = "Sales [excluding news: see note] rose in [2026]."
+    assert strip_markers(text) == (text, [])
 
 
 def test_split_claims_per_sentence() -> None:

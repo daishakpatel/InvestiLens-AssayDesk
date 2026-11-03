@@ -38,11 +38,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ### AI answers and reports
 
-- [ ] **News summary is empty in every report**, even with real news. The model writes markers
-      such as `[news:4009]` or `[source_id=news:4009]` inside its sentences, `extract_numbers`
-      reads 4009 as a figure, and the sentence is rejected as `NUMERIC_MISMATCH` (120 of 120 on
-      2026-11-01). A fix changes citation code, so rerun `make eval-report` and `make stats`
-      with it. `[code]`
+- [x] **News summary is empty in every report**: fixed 2026-11-02, see "Done". Stored reports keep
+      their empty section until regenerated. `[code]`
+- [ ] **Chat's `get_recent_news` tool ignores news relevance**: it still returns passing mentions,
+      which reports and the News tab now leave out. `[code]`
 - [x] **Report sections search with fixed keywords and no preference for recent filings**:
       fixed 2026-11-01 (ADR-0053), see "Done". The queries are still fixed keywords, but each
       section now searches only its own filing sections, latest 10-K onward. `[code]`
@@ -557,4 +556,12 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   audit was hidden because it runs after the coverage step that was failing.
 - 2026-11-02 — **News docs corrected**: the dev database holds 2,740 real Finnhub articles
   (2026-10-12 to 2026-10-30) and no sample rows. Fixtures, the eval report and the public demo stay
-  synthetic. Report news summaries are still empty, for a different reason (see section 2).
+  synthetic.
+- 2026-11-02 — **Report news summaries fixed**: every news claim was rejected because the model
+  wrote `[news:4009]` or `[source_id=news:4009]` in its JSON text, which the report path never
+  stripped, so 4009 was checked as a figure. `strip_markers` now reads those forms and reports call
+  it, keeping the model's IDs subject to the same checks. Reports also now use the News tab's
+  relevance threshold: NVIDIA's latest report cited 20 articles and only 3 named it in the title.
+  Checked on the dev DB: 118 of the 120 rejected claims pass when re-verified, and one live
+  `gemini-3.8-flash` section kept 20 of 20 with no marker left in the text. Stored reports were not
+  regenerated.
