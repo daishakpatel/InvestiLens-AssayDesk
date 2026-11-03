@@ -262,5 +262,10 @@ def test_price_ids_resolve_to_market_data(session: Session) -> None:  # CIT-006,
     assert two is not None and two.text == (
         "PRC closed at $227.21 on 2026-09-28 and $230.50 on 2026-09-29 (Tiingo end-of-day data)"
     )
-    for missing in ("price:PRC:2026-09-27", "price:PRC:not-a-date", "price:NOPE:2026-09-28"):
+    for missing in (
+        "price:PRC",
+        "price:PRC:2026-09-27",
+        "price:PRC:not-a-date",
+        "price:NOPE:2026-09-28",
+    ):
         assert resolve_source(session, missing) is None

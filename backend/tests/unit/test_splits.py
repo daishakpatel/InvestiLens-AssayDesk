@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.finance.splits import merge_splits, restate
+from sqlalchemy.orm import Session
+
+from app.finance.splits import filed_dates, merge_splits, restate
 
 _PRICED = [(date(2024, 6, 10), Decimal(10))]  # inside the price feed's five-year window
 _TAGGED = [  # NVIDIA's StockSplitConversionRatio tags, dated by their contexts
@@ -57,3 +59,8 @@ def test_a_reverse_split_raises_per_share_history() -> None:
     restated = restate(Decimal("0.50"), "USD/shares", date(2022, 3, 1), reverse)
     assert restated.value == Decimal(5)
     assert restated.note is not None and "1-for-10" in restated.note
+
+
+def test_no_accessions_returns_nothing_without_querying() -> None:
+    # An unbound session raises on any query, so this also proves the database is not touched.
+    assert filed_dates(Session(), 1, []) == {}
