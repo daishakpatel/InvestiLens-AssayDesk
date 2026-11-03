@@ -16,7 +16,8 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   backend tests and 77 frontend tests pass with them; finance and citation coverage is 100%.
 - Gemini billing is on ($10 credit added 2026-10-14). Local `.env`: `LLM_PROVIDER=gemini`,
   `LLM_MODEL_STRONG=gemini-3.5-flash-lite`, `EMBEDDING_PROVIDER=gemini`, `PRICE_PROVIDER=tiingo`,
-  `REFRESH_PRICES_ON_STARTUP=true`. News is still sample data.
+  `REFRESH_PRICES_ON_STARTUP=true`. News was still sample data then; it now comes from Finnhub
+  (see "Done", 2026-11-02).
 - Dev database: five companies (NVDA, AAPL, JPM, AMD, INTC) with real SEC financials, real prices
   and stored valuations. Filing text is parsed and embedded for all five (19,808 passages).
   Fresh research reports for JPM, AAPL and INTC (2026-10-15, `gemini-3.8-flash`); NVDA's and AMD's
@@ -37,7 +38,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ### AI answers and reports
 
-- [ ] **News summary is empty in every report**: news is still sample data. `[code]`
+- [ ] **News summary is empty in every report**, even with real news. The model writes markers
+      such as `[news:4009]` or `[source_id=news:4009]` inside its sentences, `extract_numbers`
+      reads 4009 as a figure, and the sentence is rejected as `NUMERIC_MISMATCH` (120 of 120 on
+      2026-11-01). A fix changes citation code, so rerun `make eval-report` and `make stats`
+      with it. `[code]`
 - [x] **Report sections search with fixed keywords and no preference for recent filings**:
       fixed 2026-11-01 (ADR-0053), see "Done". The queries are still fixed keywords, but each
       section now searches only its own filing sections, latest 10-K onward. `[code]`
@@ -93,8 +98,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       dated ID (`derived:NVDA:pe_ratio:<date>`) no longer resolves it. `[code]`
 - [ ] **Seed universe is 5 of 10 in dev, 3 in fixtures** (fixtures: NVDA, AAPL, JPM). Missing
       MSFT, AMZN, TSLA, GOOGL (multi-class shares), META, V, MA (§4.1). `[code]`
-- [ ] **News is sample data** (placeholder headlines); live news needs a Finnhub key, and a
-      `NEWS_PROVIDER` switch like the ones for the LLM, embeddings and prices. `[code]`
+- [x] **News is sample data**: fixed in the dev database, see "Done", 2026-11-02. The fixtures,
+      eval report and public demo stay synthetic on purpose.
+- [ ] **News runs fail when the embedding call fails**: 18 of 84 runs, including NVDA's and AAPL's
+      latest (2026-10-30). `[code]`
 - [ ] **New SEC filings arrive only when ingestion is run by hand** locally. Prices catch up at
       API start; filings have no equivalent. `[code]`
 - [ ] Prices refresh only at API start, and the check is "older than 12 hours", not "has the
@@ -260,7 +267,8 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ## 4. Never verified live
 
-- [ ] Finnhub (news) and Voyage (embeddings) paths: no API keys; parsing is unit-tested only. `[notes]`
+- [x] Finnhub (news): run live, 2,740 articles in the dev database (2026-11-02). `[code]`
+- [ ] Voyage (embeddings) path: no API key; parsing is unit-tested only. `[notes]`
 - [ ] Prometheus / Grafana dashboards, OTLP exporter, MinIO object storage. `[notes]`
 - [ ] The Celery Beat schedule and the full daily pipeline. `[notes]`
 - [ ] Light theme screen by screen; real print preview; no toast system. `[notes]`
@@ -543,3 +551,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   "what did management say about X" is no longer a metric lookup (golden q_0059/63/67 now route as
   labelled), and a deterministic structured answer sizes its own tool budget (a five-year revenue
   trend needed 9 calls against the budget of 6 and raised).
+- 2026-11-02 — **CI failures fixed**: tests for the two uncovered lines (`citation/resolver.py:201`,
+  `finance/splits.py:75`), and lockfile updates for vulnerable packages: `zod` on the frontend;
+  `certifi`, `dnspython`, `filelock` and the OpenTelemetry packages on the backend. The backend
+  audit was hidden because it runs after the coverage step that was failing.
+- 2026-11-02 — **News docs corrected**: the dev database holds 2,740 real Finnhub articles
+  (2026-10-12 to 2026-10-30) and no sample rows. Fixtures, the eval report and the public demo stay
+  synthetic. Report news summaries are still empty, for a different reason (see section 2).
