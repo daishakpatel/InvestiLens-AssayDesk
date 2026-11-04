@@ -34,7 +34,7 @@ from app.models import (
     PriceHistory,
     ResearchReport,
 )
-from app.schemas.sources import TextChunkSource
+from app.schemas.sources import DerivedMetricSource, TextChunkSource
 
 
 @pytest.fixture(scope="module")
@@ -229,6 +229,47 @@ def test_verifications_persist_with_reason_codes(session: Session, seeded: dict[
     reasons = {r.reason_code for r in rows}
     assert "UNKNOWN_SOURCE" in reasons  # the ghost-cited claim logged with its reason (CIT-005 L6)
     assert any(r.status == "accepted" for r in rows)
+
+
+def test_revenue_growth_ids_are_recomputed_from_stored_revenue(session: Session) -> None:
+    """CIT-003, CIT-006, ADR-0055: resolved from the two years the ID names, or not at all."""
+    company = Company(ticker="GRX", cik="0000000012", name="Growth Corp")
+    session.add(company)
+    session.flush()
+    for fy, value in ((2023, "100"), (2024, "150"), (2025, "225")):
+        session.add(
+            FinancialMetric(
+                company_id=company.id,
+                period=f"FY{fy}",
+                fiscal_year=fy,
+                period_type="FY",
+                metric_name="revenue",
+                metric_value=Decimal(value),
+                unit="USD",
+                source_id=f"xbrl:GRX:revenue:FY{fy}",
+                is_latest=True,
+            )
+        )
+    session.flush()
+
+    yoy = resolve_source(session, "derived:GRX:revenue_yoy:FY2024-FY2025")
+    assert yoy is not None and isinstance(yoy.source, DerivedMetricSource)
+    assert yoy.source.value == Decimal("0.5") and yoy.source.period == "FY2025"
+    assert yoy.source.formula_id == "yoy_growth"
+    assert yoy.source.input_source_ids == ["xbrl:GRX:revenue:FY2024", "xbrl:GRX:revenue:FY2025"]
+    assert yoy.text == "Revenue growth for FY2025 was 50%"
+
+    cagr = resolve_source(session, "derived:GRX:revenue_cagr:FY2023-FY2025")
+    assert cagr is not None and isinstance(cagr.source, DerivedMetricSource)
+    assert cagr.source.formula_id == "cagr" and cagr.source.value is not None
+    assert abs(cagr.source.value - Decimal("0.5")) < Decimal("1e-9")
+
+    for missing in (
+        "derived:NOPE:revenue_yoy:FY2024-FY2025",  # no such company
+        "derived:GRX:revenue_yoy:FY2019-FY2025",  # no such year
+        "derived:GRX:revenue_cagr:FY2025-FY2023",  # a span that cannot be computed
+    ):
+        assert resolve_source(session, missing) is None
 
 
 def test_price_ids_resolve_to_market_data(session: Session) -> None:  # CIT-006, ADR-0054

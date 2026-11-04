@@ -8,9 +8,11 @@ Refs: §10/§17, FR-020 (every claim cited), NFR-010 (reproducible), §10.12-13 
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import threading
+from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from alembic import command
@@ -19,6 +21,7 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.billing.budget import BudgetExceededError
+from app.citation.resolver import resolve_source
 from app.config import get_settings
 from app.embeddings.pipeline import embed_pending
 from app.models import (
@@ -33,6 +36,7 @@ from app.models import (
     ResearchSource,
     User,
 )
+from app.providers.base import LLMMessage
 from app.providers.mocks.embeddings import MockEmbeddingClient
 from app.research.payloads import build_payload
 from app.research.prompts import REPORT_PROMPT_VERSION
@@ -196,6 +200,69 @@ def test_full_report_generates_and_persists(session: Session) -> None:
         .select_from(ClaimVerification)
         .where(ClaimVerification.report_id == row.id)
     )
+
+
+class _OverlapLLM(FakeLLM):
+    """The first call waits for a second to arrive, which only happens if sections overlap."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._second = threading.Event()
+        self._lock = threading.Lock()
+        self._calls = 0
+        self.overlapped = False
+
+    async def complete_json(
+        self, messages: Sequence[LLMMessage], *, model: str, schema: dict[str, Any], max_tokens: int
+    ) -> dict[str, Any]:
+        with self._lock:
+            self._calls += 1
+            first = self._calls == 1
+        if first:
+            self.overlapped = self._second.wait(timeout=5)
+        else:
+            self._second.set()
+        return await super().complete_json(
+            messages, model=model, schema=schema, max_tokens=max_tokens
+        )
+
+
+def test_sections_generate_concurrently_and_keep_their_order(session: Session) -> None:
+    """NFR-003, NFR-010: overlapping model calls, while the report and its logs stay the same."""
+    company = _seed_company(session, "PAR", gross_margin="0.71")
+    user = User(email="par@example.com", password_hash="x", is_active=True)  # noqa: S106
+    session.add(user)
+    session.flush()
+
+    llm = _OverlapLLM()
+    overlapped = generate_report(session, company, llm=llm, user_id=user.id)
+    in_order = generate_report(session, company, llm=FakeLLM())
+
+    assert llm.overlapped
+    assert overlapped.report.model_dump() == in_order.report.model_dump()
+    assert overlapped.data_version == in_order.data_version
+    assert session.scalar(
+        select(func.count())
+        .select_from(LlmCall)
+        .where(LlmCall.purpose == "report_section", LlmCall.user_id == user.id)
+    )
+
+
+def test_revenue_growth_citations_resolve(session: Session) -> None:
+    """CIT-003, CIT-006: a growth figure a report cites opens with its formula and inputs."""
+    company = _seed_company(session, "GRW", gross_margin="0.70")
+    _, evidence = build_payload(session, company.id, "revenue_analysis")
+    growth = {e.source_id: e for e in evidence if ":revenue_" in e.source_id}
+    assert set(growth) == {
+        "derived:GRW:revenue_yoy:FY2024-FY2025",
+        "derived:GRW:revenue_cagr:FY2023-FY2025",
+    }
+    for source_id, item in growth.items():
+        detail = resolve_source(session, source_id)
+        assert detail is not None and detail.source.source_type == "derived_metric"
+        assert detail.source.value == item.source.value  # type: ignore[union-attr]
+        assert detail.source.input_source_ids == item.source.input_source_ids  # type: ignore[union-attr]
+        assert len(detail.lineage) == 2
 
 
 def test_report_generation_logs_every_llm_call(session: Session) -> None:

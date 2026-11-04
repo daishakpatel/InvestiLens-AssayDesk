@@ -106,6 +106,7 @@ line when it is fixed.
 | Live-model eval (Recall@5, judge faithfulness, cost) not published | Open: needs a paid run | [21 — evaluation](../Instructions/21_phase5b_evaluation_framework.md) |
 | Load test never run against a deployed stack | Open | [22 — observability](../Instructions/22_phase5c_observability_and_security.md) |
 | Public demo not yet deployed | Open: ready, needs the owner's Render account | [37 — this phase](../Instructions/37_phase7l_measured_results_and_polish.md) |
+| A report whose model calls all fail is saved as complete, replacing the previous one | Open | [14 — reports](../Instructions/14_phase3b_research_report_generation.md) |
 | No email delivery for verification and password reset | Open | [17 — auth](../Instructions/17_phase4b_auth_and_users.md) |
 
 ## How I'd validate this with a real analyst

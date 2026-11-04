@@ -19,6 +19,7 @@ from app.citation.evidence import EvidenceItem
 from app.finance import metrics as fin
 from app.finance.display import format_metric_value, metric_label
 from app.finance.valuation_builder import LATEST, VALUATION_METRICS
+from app.models import Company
 from app.repositories import metrics as metric_repo
 from app.research.evidence import from_metric, metric_source_id
 
@@ -88,7 +89,8 @@ def _series_block(
         if r.metric_value is not None
     ]
     if name == "revenue" and len(valued) >= 2:
-        calc, calc_ev = _growth_block(valued)
+        company = session.get(Company, company_id)
+        calc, calc_ev = _growth_block(valued, company.ticker if company else "")
         if calc:
             block["calculated"] = calc
             evidence.extend(calc_ev)
@@ -96,11 +98,11 @@ def _series_block(
 
 
 def _growth_block(
-    valued: list[tuple[int | None, Decimal, str]],
+    valued: list[tuple[int | None, Decimal, str]], ticker: str
 ) -> tuple[dict[str, Any], list[EvidenceItem]]:
-    (_, prior, prior_sid), (last_fy, last, last_sid) = valued[-2], valued[-1]
-    (_, first, first_sid) = valued[0]
-    years = (last_fy or 0) - (valued[0][0] or 0)
+    (prior_fy, prior, prior_sid), (last_fy, last, last_sid) = valued[-2], valued[-1]
+    (first_fy, first, first_sid) = valued[0]
+    years = (last_fy or 0) - (first_fy or 0)
     yoy = fin.yoy_growth(last, prior)
     out: dict[str, Any] = {}
     evidence: list[EvidenceItem] = []
@@ -109,7 +111,15 @@ def _growth_block(
             "value": format_metric_value(yoy.value, "ratio"),
             "source_ids": [last_sid, prior_sid],
         }
-        evidence.append(_derived_ev(f"derived:revenue_yoy_FY{last_fy}", "yoy_growth", yoy.value))
+        evidence.append(
+            _derived_ev(
+                f"derived:{ticker}:revenue_yoy:FY{prior_fy}-FY{last_fy}",
+                "yoy_growth",
+                yoy.value,
+                period=f"FY{last_fy}",
+                inputs=[prior_sid, last_sid],
+            )
+        )
     if years >= 2:
         cagr = fin.cagr(first, last, years)
         if cagr.value is not None:
@@ -118,16 +128,32 @@ def _growth_block(
                 "years": years,
                 "source_ids": [first_sid, last_sid],
             }
-            evidence.append(_derived_ev(f"derived:revenue_cagr_FY{last_fy}", "cagr", cagr.value))
+            evidence.append(
+                _derived_ev(
+                    f"derived:{ticker}:revenue_cagr:FY{first_fy}-FY{last_fy}",
+                    "cagr",
+                    cagr.value,
+                    period=f"FY{last_fy}",
+                    inputs=[first_sid, last_sid],
+                )
+            )
     return out, evidence
 
 
-def _derived_ev(source_id: str, formula_id: str, value: Decimal) -> EvidenceItem:
+def _derived_ev(
+    source_id: str, formula_id: str, value: Decimal, *, period: str, inputs: list[str]
+) -> EvidenceItem:
     from app.schemas.sources import DerivedMetricSource
 
     return EvidenceItem(
         source=DerivedMetricSource(
-            source_id=source_id, tier=1, formula_id=formula_id, formula_version="v1", value=value
+            source_id=source_id,
+            tier=1,
+            formula_id=formula_id,
+            formula_version="v1",
+            input_source_ids=inputs,
+            value=value,
+            period=period,
         ),
         text=f"{metric_label(formula_id)} was {format_metric_value(value, 'ratio')}",
         retrieval_score=0.9,

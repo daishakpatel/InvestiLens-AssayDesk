@@ -15,6 +15,8 @@ import logging
 import re
 import time
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -54,6 +56,8 @@ from app.schemas.sources import NewsItemSource
 from app.utils.logging import get_logger, log_event
 
 logger = get_logger(__name__)
+
+_SECTION_WORKERS = 6  # how many model calls may be in flight; the provider client paces them
 
 _RISK_CATEGORIES = set(get_args(Risk.model_fields["category"].annotation))
 _MGMT_TOPICS = set(get_args(ManagementTopicStatement.model_fields["topic"].annotation))
@@ -238,16 +242,11 @@ def generate_report(
     citations: dict[str, Citation] = {}
     insufficient: list[str] = []
 
+    jobs: list[tuple[str, Sequence[EvidenceItem], dict[str, Any]]] = []
+
     def record(section: str, evidence: Sequence[EvidenceItem], payload: dict[str, Any]) -> None:
         evidence_ids.update(item.source_id for item in evidence)
-        gen = _run_section(
-            llm, section, payload, evidence, settings, session=session, user_id=user_id
-        )
-        sections[section] = gen
-        if gen.insufficient:
-            insufficient.append(section)
-        for c in gen.verified.citations:
-            citations.setdefault(c.source_id, c)
+        jobs.append((section, evidence, payload))
 
     since = _latest_10k_date(session, company.id)
     for section in _PROSE_SECTIONS:
@@ -263,6 +262,31 @@ def generate_report(
     shared_pool = _retrieve(session, company.id, "factors", settings=settings, since=since)
     record("bull_factors", shared_pool, {})
     record("bear_factors", shared_pool, {})
+
+    # Only the model calls overlap (NFR-003, ADR-0055): this thread leaves `session` alone until
+    # they finish, and reads results in section order so a report stays reproducible (NFR-010).
+    with ThreadPoolExecutor(max_workers=_SECTION_WORKERS) as pool:
+        futures = [
+            pool.submit(
+                copy_context().run,  # keeps the request ID and trace on each section's logs
+                _run_section,
+                llm,
+                section,
+                payload,
+                evidence,
+                settings,
+                session=session,
+                user_id=user_id,
+            )
+            for section, evidence, payload in jobs
+        ]
+    for (section, _, _), future in zip(jobs, futures, strict=True):
+        gen = future.result()
+        sections[section] = gen
+        if gen.insufficient:
+            insufficient.append(section)
+        for c in gen.verified.citations:
+            citations.setdefault(c.source_id, c)
 
     report = _assemble(sections)
     _annotate_risk_changes(session, report.risks, llm=llm, settings=settings, user_id=user_id)

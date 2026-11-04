@@ -34,6 +34,15 @@ def test_rate_limiter_spaces_calls() -> None:
     assert slept == [pytest.approx(0.2, abs=1e-6)]  # only the second call waits
 
 
+def test_rate_limiter_gives_concurrent_callers_separate_slots() -> None:
+    """LGL-002, NFR-003: callers arriving together (parallel report sections) still get spaced."""
+    slept: list[float] = []
+    limiter = RateLimiter(rate_per_sec=5.0)
+    for _ in range(3):
+        limiter.acquire(sleep=slept.append, now=lambda: 0.0)  # the clock has not moved
+    assert slept == [pytest.approx(0.2, abs=1e-6), pytest.approx(0.4, abs=1e-6)]
+
+
 def test_sends_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, str] = {}
 

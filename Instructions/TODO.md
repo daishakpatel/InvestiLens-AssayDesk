@@ -38,17 +38,27 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ### AI answers and reports
 
-- [x] **News summary is empty in every report**: fixed 2026-11-02, see "Done". Stored reports keep
-      their empty section until regenerated. `[code]`
+- [x] **News summary is empty in every report**: fixed 2026-11-02, see "Done". `[code]`
 - [ ] **Chat's `get_recent_news` tool ignores news relevance**: it still returns passing mentions,
       which reports and the News tab now leave out. `[code]`
 - [x] **Report sections search with fixed keywords and no preference for recent filings**:
       fixed 2026-11-01 (ADR-0053), see "Done". The queries are still fixed keywords, but each
       section now searches only its own filing sections, latest 10-K onward. `[code]`
 - [x] **Price questions go to document search**: fixed 2026-11-01 (ADR-0054), see "Done".
-- [ ] **Report speed**: about 70 s on `gemini-3.5-flash-lite` (18 calls), 171 s on `gemini-3.8-flash`
-      with free-tier pacing, against a 90 s target (NFR-003). `LLM_RATE_LIMIT_PER_SEC` (0.25) can be
-      raised now that billing is on. `[code]`
+- [ ] **Report speed**: sections now run concurrently (ADR-0055): NVIDIA 75 s and Apple 58 s at the
+      default `LLM_RATE_LIMIT_PER_SEC` (0.25), against 85–100 s before and a 90 s target (NFR-003).
+      JPMorgan, AMD and Intel were not measured: the prepaid credit ran out mid-run. Re-measure all
+      five after topping up, and try a higher limit, since it now sets the speed. `[code]`
+- [x] **Reports cite revenue growth IDs that do not resolve**: fixed 2026-11-03 (ADR-0055). Reports
+      generated earlier keep their old IDs, which still do not resolve. `[code]`
+- [ ] **A report whose model calls all fail is saved as `complete`** and becomes the company's
+      latest, replacing a good one with an empty one. Seen 2026-11-03 when credit ran out (reports
+      37 and 38, marked `failed` by hand; 36 lost six sections). Generation should fail the job and
+      keep the previous report. `[code]`
+- [ ] **Starting Celery beat locally can spend the whole Gemini credit**: overdue jobs fire at once,
+      and `EMBED_EXHIBITS` defaults to true, so the scheduled pipeline embeds proxies and exhibits
+      too. On 2026-11-03 that ran 615 batches of up to 128 chunks in 14 minutes before the first 402.
+      No `llm_calls` row exists for those batches, so the spend is not visible in the app. `[code]`
 - [ ] Comparison commentary and filing-diff adjudication have never run on a real model. `[notes]`
 
 ### Measured numbers (§36 #20)
@@ -563,5 +573,6 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   it, keeping the model's IDs subject to the same checks. Reports also now use the News tab's
   relevance threshold: NVIDIA's latest report cited 20 articles and only 3 named it in the title.
   Checked on the dev DB: 118 of the 120 rejected claims pass when re-verified, and one live
-  `gemini-3.8-flash` section kept 20 of 20 with no marker left in the text. Stored reports were not
-  regenerated.
+  `gemini-3.8-flash` section kept 20 of 20 with no marker left in the text. The five latest reports
+  were regenerated on 2026-11-03 (ids 29–33, $0.39): 100 of 100 news claims kept, and 16–17 of each
+  report's 20 articles name the company in the title. Checked in the browser on NVIDIA's report.

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -43,6 +44,7 @@ _LIST_KEY = {
     "bear_factors": "factors",
 }
 _MAX_TOKENS = 1500
+_SESSION_LOCK = threading.Lock()  # sections run in parallel and share the report's session to log
 
 
 @dataclass
@@ -116,20 +118,21 @@ def _logged_complete_json(
                 input_estimate=input_tokens,
                 output_estimate=estimate_tokens(json.dumps(raw)) if status == "success" else None,
             )
-            llm_repo.record_call(
-                session,
-                purpose="report_section",
-                model=model,
-                input_tokens=tokens_in,
-                output_tokens=tokens_out,
-                latency_ms=latency_ms,
-                cost_usd=estimate_cost(
-                    model=model, input_tokens=tokens_in, output_tokens=tokens_out or 0
-                ),
-                status=status,
-                prompt_version=REPORT_PROMPT_VERSION,
-                user_id=user_id,
-            )
+            with _SESSION_LOCK:
+                llm_repo.record_call(
+                    session,
+                    purpose="report_section",
+                    model=model,
+                    input_tokens=tokens_in,
+                    output_tokens=tokens_out,
+                    latency_ms=latency_ms,
+                    cost_usd=estimate_cost(
+                        model=model, input_tokens=tokens_in, output_tokens=tokens_out or 0
+                    ),
+                    status=status,
+                    prompt_version=REPORT_PROMPT_VERSION,
+                    user_id=user_id,
+                )
     return raw
 
 

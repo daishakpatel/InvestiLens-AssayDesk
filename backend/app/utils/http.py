@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import random
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -34,6 +35,7 @@ class RateLimiter:
     def __init__(self, rate_per_sec: float) -> None:
         self._min_interval = 1.0 / rate_per_sec if rate_per_sec > 0 else 0.0
         self._last: float | None = None  # None = no call yet (first call never waits)
+        self._lock = threading.Lock()
 
     def acquire(
         self,
@@ -41,11 +43,12 @@ class RateLimiter:
         sleep: Callable[[float], None] = time.sleep,
         now: Callable[[], float] = time.monotonic,
     ) -> None:
-        if self._last is not None:
-            wait = self._min_interval - (now() - self._last)
-            if wait > 0:
-                sleep(wait)
-        self._last = now()
+        with self._lock:  # reserve a slot, and sleep outside so the next caller can take its own
+            current = now()
+            start = current if self._last is None else max(current, self._last + self._min_interval)
+            self._last = start
+        if start > current:
+            sleep(start - current)
 
 
 @dataclass

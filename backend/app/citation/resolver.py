@@ -5,6 +5,8 @@ document-chunk anchor as the default) keeps resolution unambiguous:
 - ``news:<id>``     → news_item
 - ``xbrl:<fact_id>``→ xbrl_fact
 - ``derived:…`` (or a `financial_metrics.source_id` match) → derived_metric (with lineage, CIT-003)
+- ``derived:<TICKER>:revenue_<yoy|cagr>:FY<start>-FY<end>`` → the same, computed from those two
+  years' stored revenue (ADR-0055)
 - ``redflag:<TICKER>:<rule>:<accession>`` → the flag's quoted filing text as a text_chunk, with
   the filing as the deep link (Phase 7e, FR-RF-008)
 - ``price:<TICKER>:<date>[:<end_date>]`` → price_bar: that trading day's bar, or two days' closes
@@ -15,12 +17,14 @@ document-chunk anchor as the default) keeps resolution unambiguous:
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.finance.display import describe_metric, format_price
+from app.finance.metrics import cagr, yoy_growth
 from app.models import (
     Company,
     Document,
@@ -42,6 +46,8 @@ from app.schemas.sources import (
     TextChunkSource,
     XbrlFactSource,
 )
+
+_REVENUE_GROWTH = re.compile(r"derived:([^:]+):revenue_(yoy|cagr):FY(\d{4})-FY(\d{4})")
 
 
 def _news(row: News) -> SourceDetail:
@@ -171,11 +177,61 @@ def resolve_source(session: Session, source_id: str) -> SourceDetail | None:
     )
     if metric is not None:
         return _metric(metric)
+    growth = _REVENUE_GROWTH.fullmatch(source_id)
+    if growth:
+        return _revenue_growth(session, source_id, growth)
     if source_id.startswith("xbrl:"):
         fact = session.get(FinancialFact, _as_int(source_id.split(":", 1)[1]))
         return _xbrl(fact) if fact else None
     chunk = session.scalar(select(DocumentChunk).where(DocumentChunk.paragraph_id == source_id))
     return _chunk(session, chunk) if chunk else None
+
+
+def _revenue_growth(session: Session, source_id: str, match: re.Match[str]) -> SourceDetail | None:
+    """A report's growth figure, recomputed from the two revenue rows its ID names (ADR-0055)."""
+    ticker, kind, start, end = match[1], match[2], int(match[3]), int(match[4])
+    rows = {
+        row.fiscal_year: row
+        for row in session.scalars(
+            select(FinancialMetric)
+            .join(Company, Company.id == FinancialMetric.company_id)
+            .where(
+                Company.ticker == ticker,
+                FinancialMetric.metric_name == "revenue",
+                FinancialMetric.period_type == "FY",
+                FinancialMetric.is_latest.is_(True),
+                FinancialMetric.fiscal_year.in_([start, end]),
+            )
+        )
+    }
+    if start not in rows or end not in rows:
+        return None
+    first, last = rows[start], rows[end]
+    result = (
+        yoy_growth(last.metric_value, first.metric_value)
+        if kind == "yoy"
+        else cagr(first.metric_value, last.metric_value, end - start)
+    )
+    if result.value is None:
+        return None
+    return _metric(
+        FinancialMetric(  # never added to the session: this figure is computed, not stored
+            source_id=source_id,
+            metric_name=result.formula_id,
+            period=f"FY{end}",
+            metric_value=result.value,
+            unit=result.unit,
+            is_derived=True,
+            formula_id=result.formula_id,
+            quality_flags={
+                "formula_version": result.formula_version,
+                "inputs": [
+                    {"name": "revenue", "period": row.period, "source_id": row.source_id}
+                    for row in (first, last)
+                ],
+            },
+        )
+    )
 
 
 def _bar_text(ticker: str, bar: PriceHistory) -> str:
