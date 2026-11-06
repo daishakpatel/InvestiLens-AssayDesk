@@ -45,20 +45,20 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       fixed 2026-11-01 (ADR-0053), see "Done". The queries are still fixed keywords, but each
       section now searches only its own filing sections, latest 10-K onward. `[code]`
 - [x] **Price questions go to document search**: fixed 2026-11-01 (ADR-0054), see "Done".
-- [ ] **Report speed**: sections now run concurrently (ADR-0055): NVIDIA 75 s and Apple 58 s at the
-      default `LLM_RATE_LIMIT_PER_SEC` (0.25), against 85–100 s before and a 90 s target (NFR-003).
-      JPMorgan, AMD and Intel were not measured: the prepaid credit ran out mid-run. Re-measure all
-      five after topping up, and try a higher limit, since it now sets the speed. `[code]`
+- [ ] **Report speed**: sections now run concurrently (ADR-0055). At the default
+      `LLM_RATE_LIMIT_PER_SEC` (0.25) on `gemini-3.8-flash`: Apple 58 s, AMD 72 s, NVIDIA 75 s,
+      Intel 76 s, JPMorgan 97 s (2026-11-03), against 85–100 s before and a 90 s target (NFR-003).
+      JPMorgan is still over. A higher limit is untried and now sets the speed. `[code]`
 - [x] **Reports cite revenue growth IDs that do not resolve**: fixed 2026-11-03 (ADR-0055). Reports
       generated earlier keep their old IDs, which still do not resolve. `[code]`
 - [ ] **A report whose model calls all fail is saved as `complete`** and becomes the company's
       latest, replacing a good one with an empty one. Seen 2026-11-03 when credit ran out (reports
       37 and 38, marked `failed` by hand; 36 lost six sections). Generation should fail the job and
       keep the previous report. `[code]`
-- [ ] **Starting Celery beat locally can spend the whole Gemini credit**: overdue jobs fire at once,
-      and `EMBED_EXHIBITS` defaults to true, so the scheduled pipeline embeds proxies and exhibits
-      too. On 2026-11-03 that ran 615 batches of up to 128 chunks in 14 minutes before the first 402.
-      No `llm_calls` row exists for those batches, so the spend is not visible in the app. `[code]`
+- [ ] **Starting Celery beat locally embeds the whole backlog**: overdue jobs fire at once, and
+      `EMBED_EXHIBITS` defaults to true, so proxies and press releases are embedded too (about 14,000
+      chunks in the dev DB). The paid-twice part is fixed (see "Done", 2026-11-04); the dev `.env` now
+      sets `EMBED_EXHIBITS=false`, but the default still embeds them on a fresh setup. `[code]`
 - [ ] Comparison commentary and filing-diff adjudication have never run on a real model. `[notes]`
 
 ### Measured numbers (§36 #20)
@@ -576,3 +576,13 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   `gemini-3.8-flash` section kept 20 of 20 with no marker left in the text. The five latest reports
   were regenerated on 2026-11-03 (ids 29–33, $0.39): 100 of 100 news claims kept, and 16–17 of each
   report's 20 articles name the company in the title. Checked in the browser on NVIDIA's report.
+- 2026-11-04 — **Embedding backlogs no longer pay twice**: `refresh_company_data` and
+  `generate_embeddings` embedded a backlog in one transaction, so a 429 part-way rolled back every
+  vector already bought, and its `llm_calls` row, and the Celery retry bought them again. On
+  2026-11-03 at least 46,592 chunks were sent in about 17 minutes and almost none were kept, which
+  (with the earlier run) used up the prepaid Gemini credit. Both tasks now call `embed_all`, which
+  commits after each batch as `scripts/embed_chunks.py` already did.
+- 2026-11-04 — **CI's Trivy scan installs again**: the official install script downloads from
+  `get.trivy.dev`, which stopped resolving (aquasecurity/trivy#11537, closed as not planned), so
+  `build-images` failed on every push. CI now downloads the pinned release tarball from GitHub and
+  checks it against the release's checksums.

@@ -10,7 +10,7 @@ EMB-004 (HNSW cosine), RAG-010 (vector + keyword search).
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 import pytest
 from alembic import command
@@ -18,11 +18,12 @@ from alembic.config import Config
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from app.embeddings.pipeline import embed_pending
+from app.embeddings.pipeline import embed_all, embed_pending
 from app.embeddings.reembed import migrate_model
 from app.models import Company, Document, DocumentChunk, LlmCall
 from app.providers.mocks.embeddings import MOCK_MODEL, MockEmbeddingClient
 from app.rag.search import keyword_search, vector_search, vector_search_by_vector
+from app.utils.http import HttpClientError
 
 _CHUNK_TEXTS = [
     "Gross margin expanded in fiscal 2025 due to a richer mix of data-center products.",
@@ -164,6 +165,79 @@ def test_embedding_can_stop_after_a_batch_and_resume(session: Session, seeded: C
     rest = embed_pending(session, client=client, batch_size=2)
     assert first.embedded + rest.embedded == len(_CHUNK_TEXTS)
     assert embed_pending(session, client=client).embedded == 0  # nothing left
+
+
+class _FailsOnCall(MockEmbeddingClient):
+    """Refuses the `n`th request, as Gemini did part-way through a backlog (429, then 402)."""
+
+    def __init__(self, n: int) -> None:
+        super().__init__()
+        self._n = n
+        self.calls = 0
+
+    async def embed(
+        self, texts: Sequence[str], *, input_type: str = "document"
+    ) -> Sequence[Sequence[float]]:
+        self.calls += 1
+        if self.calls == self._n:
+            raise HttpClientError("429 Too Many Requests")
+        return await super().embed(texts, input_type=input_type)
+
+
+@pytest.fixture
+def committing_session(_migrated: None, test_engine: Engine) -> Iterator[Session]:
+    """A session whose commits are savepoints inside one outer transaction undone at the end."""
+    with test_engine.connect() as conn:
+        outer = conn.begin()
+        with Session(bind=conn, join_transaction_mode="create_savepoint") as s:
+            yield s
+        outer.rollback()
+
+
+def test_embed_all_keeps_batches_paid_for_before_a_provider_error(
+    committing_session: Session,
+) -> None:
+    """EMB-002, NFR-008: a refusal part-way loses one batch, not every batch before it.
+
+    The Celery tasks embedded a backlog in one transaction, so one 429 rolled back all the paid
+    vectors and their cost rows, and the retry paid for them again (2026-11-03).
+    """
+    session = committing_session
+    company = Company(ticker="EMB", cik="0000000002", name="Embed Corp")
+    session.add(company)
+    session.flush()
+    doc = Document(
+        company_id=company.id, document_type="filing", source_tier=1, content_hash="hash-emb"
+    )
+    session.add(doc)
+    session.flush()
+    for i, body in enumerate(_CHUNK_TEXTS):
+        session.add(
+            DocumentChunk(
+                document_id=doc.id,
+                company_id=company.id,
+                chunk_index=i,
+                chunk_type="text",
+                text=body,
+                section="Item 7",
+                parser_version="doc-parse-v1",
+            )
+        )
+    session.commit()
+    calls_logged = select(func.count()).select_from(LlmCall)
+    before = session.scalar(calls_logged) or 0
+
+    client = _FailsOnCall(2)
+    with pytest.raises(HttpClientError):
+        embed_all(session, client=client, batch_size=2)
+    session.rollback()  # what the task's transaction does on the way out
+
+    assert sum(c.embedding is not None for c in _chunks(session, company.id)) == 2
+    assert (session.scalar(calls_logged) or 0) - before == 1  # the paid batch keeps its cost row
+
+    rest = embed_all(session, client=MockEmbeddingClient(), batch_size=2)
+    assert (rest.embedded, rest.batches) == (len(_CHUNK_TEXTS) - 2, 2)
+    assert all(c.embedding is not None for c in _chunks(session, company.id))
 
 
 def test_keyword_search_answers_a_full_sentence_question(session: Session, seeded: Company) -> None:
