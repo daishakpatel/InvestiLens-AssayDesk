@@ -105,14 +105,20 @@ jobs:
         run: docker build -f backend/Dockerfile -t assay-desk-api:ci .
       - name: Build frontend image
         run: docker build -f frontend/Dockerfile -t assay-desk-frontend:ci frontend
-      # Scan the built backend image for OS/library CVEs (SEC-009 container scanning). Trivy is
-      # installed from its official script (pinned to a version) rather than a marketplace action
-      # so the ref always resolves and the scan is reproducible. Report-only for now (|| true);
-      # drop the `|| true` to gate once a clean baseline is established.
+      # Scan the built backend image for OS/library CVEs (SEC-009 container scanning). Trivy is a
+      # pinned release tarball from GitHub, checked against the release's checksums: the official
+      # install script downloads from get.trivy.dev, which stopped resolving on 2026-11-04
+      # (aquasecurity/trivy#11537). Report-only for now (|| true); drop the `|| true` to gate once
+      # a clean baseline is established.
       - name: Scan backend image (Trivy)
+        env:
+          TRIVY_VERSION: 0.75.0
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.75.0/contrib/install.sh \
-            | sh -s -- -b /usr/local/bin v0.75.0
+          base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+          tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -sfLO "${base}/${tarball}"
+          curl -sfL "${base}/trivy_${TRIVY_VERSION}_checksums.txt" | grep " ${tarball}\$" | sha256sum -c -
+          sudo tar -xzf "${tarball}" -C /usr/local/bin trivy
           trivy image --severity HIGH,CRITICAL --exit-code 0 assay-desk-api:ci || true
 
   # The §18.4 eval smoke gate runs as the `test_eval_runner` integration test inside the `backend`
