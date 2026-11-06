@@ -113,3 +113,24 @@ def embed_pending(
             latency_ms=latency_ms,
         )
     return counts
+
+
+def embed_all(
+    session: Session, *, client: EmbeddingClient | None = None, batch_size: int | None = None
+) -> EmbedCounts:
+    """`embed_pending` for a whole backlog, committing each batch as it is paid for.
+
+    One transaction for the backlog meant a provider error part-way rolled back every vector
+    already bought, and the retry bought them again. Commits everything pending in `session` too.
+    """
+    client = client or get_embedding_client()  # one client, so its rate limiter paces every batch
+    total = EmbedCounts()
+    while True:
+        counts = embed_pending(session, client=client, batch_size=batch_size, max_batches=1)
+        session.commit()
+        if not counts.embedded:
+            return total
+        total.embedded += counts.embedded
+        total.batches += counts.batches
+        total.tokens += counts.tokens
+        total.cost_usd += counts.cost_usd

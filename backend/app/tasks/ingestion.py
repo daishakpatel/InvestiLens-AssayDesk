@@ -15,7 +15,7 @@ from celery import Task
 from app.comparison.peers import refresh_default_peer_set
 from app.db import _session_factory, session_scope
 from app.earnings.service import after_filings
-from app.embeddings.pipeline import embed_pending
+from app.embeddings.pipeline import embed_all
 from app.finance.builder import build_company_metrics
 from app.finance.footnote_builder import build_company_footnotes
 from app.finance.quality_builder import build_company_earnings_quality
@@ -105,7 +105,7 @@ def parse_documents(self: Task, ticker: str) -> int:
 @celery_app.task(bind=True, queue="ingestion", name="generate_embeddings", **RETRY_KWARGS)
 def generate_embeddings(self: Task) -> int:
     with job_task(self, job_type="generate_embeddings") as (session, _progress):
-        counts = embed_pending(session)
+        counts = embed_all(session)
     return counts.embedded
 
 
@@ -167,7 +167,7 @@ def _refresh_one(ticker: str) -> None:
         # Same chain as the ingest: a new earnings 8-K's EX-99 exhibits, fetched above, are
         # parsed and embedded here within one poll interval (FR-EX-015).
         parse_company_documents(session, company.id, storage=storage)
-        embed_pending(session)
+        embed_all(session)  # commits the parse too, so a 429 later in the backlog keeps both
         build_company_metrics(session, company)
         build_company_ratios(session, company)
         build_company_valuation(session, company)
