@@ -38,9 +38,11 @@ from app.models import (
 )
 from app.providers.base import LLMMessage
 from app.providers.mocks.embeddings import MockEmbeddingClient
+from app.repositories import reports as report_repo
 from app.research.payloads import build_payload
 from app.research.prompts import REPORT_PROMPT_VERSION
-from app.research.report import _news_evidence, generate_report
+from app.research.report import ReportGenerationError, _news_evidence, generate_report
+from app.utils.http import HttpClientError
 from tests.fakes import FakeLLM
 
 _CHUNKS = [
@@ -285,6 +287,34 @@ def test_report_generation_logs_every_llm_call(session: Session) -> None:
         assert row.model
         assert row.cost_usd is not None
         assert row.latency_ms is not None
+
+
+class _RefusingLLM(FakeLLM):
+    """Every call raises, as Gemini's 402 did once the prepaid credit ran out (2026-11-03)."""
+
+    async def complete_json(
+        self, messages: Sequence[LLMMessage], *, model: str, schema: dict[str, Any], max_tokens: int
+    ) -> dict[str, Any]:
+        raise HttpClientError("402 Payment Required")
+
+
+def test_report_whose_model_calls_all_fail_is_not_saved(session: Session) -> None:
+    """ERR-002, FR-030: an outage must not replace the latest good report with an empty one."""
+    company = _seed_company(session, "OUT", gross_margin="0.71")
+    good = generate_report(session, company, llm=FakeLLM())
+    reports = (
+        select(func.count())
+        .select_from(ResearchReport)
+        .where(ResearchReport.company_id == company.id)
+    )
+    before = session.scalar(reports)
+
+    with pytest.raises(ReportGenerationError):
+        generate_report(session, company, llm=_RefusingLLM())
+
+    assert session.scalar(reports) == before
+    latest = report_repo.get_latest_complete(session, company_id=company.id)
+    assert latest is not None and latest.id == good.report_id
 
 
 def test_report_generation_blocked_over_ai_budget(session: Session) -> None:

@@ -15,12 +15,14 @@ isolation are covered end-to-end by `tests/integration/test_sec_ingestion.py`
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import httpx
 import pytest
 
 from app.citation.evidence import EvidenceItem
+from app.providers.base import LLMMessage
 from app.research.generator import generate_section
 from app.schemas.sources import TextChunkSource
 from app.utils.http import HardenedHttpClient, HttpClientError
@@ -102,6 +104,25 @@ def test_malformed_json_section_marked_insufficient_not_crash() -> None:
     )
     assert result.insufficient is True
     assert result.items == []  # nothing fabricated from unparseable output
+    assert result.failed is False  # the model answered; it is not a provider failure
+
+
+class _RefusingLLM(FakeLLM):
+    """Every call raises, as Gemini's 402 did once the prepaid credit ran out (2026-11-03)."""
+
+    async def complete_json(
+        self, messages: Sequence[LLMMessage], *, model: str, schema: dict[str, Any], max_tokens: int
+    ) -> dict[str, Any]:
+        raise HttpClientError("402 Payment Required")
+
+
+def test_provider_error_on_both_attempts_marks_the_section_failed() -> None:
+    """ERR-002, HAL-001: a refused call is a failure, not "insufficient evidence"."""
+    result = generate_section(
+        _RefusingLLM(), section="risks", payload={}, evidence=_risk_evidence()
+    )
+    assert result.insufficient is True and result.failed is True
+    assert result.items == []
 
 
 def test_valid_json_section_produces_verified_claim() -> None:

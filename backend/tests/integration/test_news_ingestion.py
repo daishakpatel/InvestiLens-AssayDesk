@@ -15,9 +15,11 @@ from sqlalchemy.orm import Session
 
 from app.ingestion.news import ingest_news
 from app.ingestion.sec import ingest_company
-from app.models import Company, Document, News
+from app.models import Company, Document, IngestionRun, News
 from app.providers.news.base import NewsArticle, NewsSource
 from app.providers.sec.mock import MockSecSource
+from app.rag import tools
+from app.utils.http import HttpClientError
 from app.utils.storage import FilesystemObjectStorage
 
 _NOW = datetime(2026, 9, 25, 12, tzinfo=UTC)
@@ -145,6 +147,43 @@ def test_passing_mention_scores_below_threshold(session: Session, nvda: Company)
     relevant = rows["NVIDIA unveils Blackwell GPU"].relevance_score
     assert passing is not None and passing < Decimal("0.3")  # DoD: below display threshold
     assert relevant is not None and relevant >= Decimal("0.3")
+
+
+def test_chat_news_tool_leaves_out_passing_mentions(session: Session, nvda: Company) -> None:
+    """RAG-031, §10.8: chat sees the same news as the News tab and reports, not market stories."""
+    ingest_news(session, nvda, source=_StubNewsSource(), embed_fn=_embed)
+    out = tools.get_recent_news(session, "NVDA", days=3650)  # the stub articles are dated 2026-09
+    titles = {item["title"] for item in out["items"]}
+    assert "NVIDIA unveils Blackwell GPU" in titles
+    assert "Broad tech rally lifts indexes" not in titles
+    assert len(out["source_ids"]) == len(out["items"])
+
+
+def _refuse(titles: list[str]) -> list[list[float]]:
+    raise HttpClientError("request failed after retries: POST .../batchEmbedContents")
+
+
+def test_news_is_kept_when_the_embedding_call_fails(session: Session, nvda: Company) -> None:
+    """ING-005: grouping near-duplicates is an extra; a refused embedding must not lose the news.
+
+    18 of 84 runs were dead-lettered this way by 2026-10-30, all on embedding 429s and 402s.
+    """
+    counts = ingest_news(session, nvda, source=_StubNewsSource(), embed_fn=_refuse)
+
+    rows = {r.title: r for r in _news(session, nvda.id)}
+    assert counts.ingested == 4 and len(rows) == 3  # identical headlines still share one row
+    # Without vectors only identical headlines group, so the reworded copy stands alone.
+    assert (
+        rows["Nvidia reveals Blackwell accelerator"].event_cluster_id
+        != rows["NVIDIA unveils Blackwell GPU"].event_cluster_id
+    )
+    run = session.scalars(
+        select(IngestionRun)
+        .where(IngestionRun.source == "news", IngestionRun.company_id == nvda.id)
+        .order_by(IngestionRun.id.desc())
+    ).first()
+    assert run is not None and run.status == "success"
+    assert run.counts is not None and run.counts["clustering"] == "skipped"
 
 
 def test_reingest_is_idempotent(session: Session, nvda: Company) -> None:
