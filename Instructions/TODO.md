@@ -39,8 +39,7 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 ### AI answers and reports
 
 - [x] **News summary is empty in every report**: fixed 2026-11-02, see "Done". `[code]`
-- [ ] **Chat's `get_recent_news` tool ignores news relevance**: it still returns passing mentions,
-      which reports and the News tab now leave out. `[code]`
+- [x] **Chat's `get_recent_news` tool ignores news relevance**: fixed 2026-11-05, see "Done". `[code]`
 - [x] **Report sections search with fixed keywords and no preference for recent filings**:
       fixed 2026-11-01 (ADR-0053), see "Done". The queries are still fixed keywords, but each
       section now searches only its own filing sections, latest 10-K onward. `[code]`
@@ -51,10 +50,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       JPMorgan is still over. A higher limit is untried and now sets the speed. `[code]`
 - [x] **Reports cite revenue growth IDs that do not resolve**: fixed 2026-11-03 (ADR-0055). Reports
       generated earlier keep their old IDs, which still do not resolve. `[code]`
-- [ ] **A report whose model calls all fail is saved as `complete`** and becomes the company's
-      latest, replacing a good one with an empty one. Seen 2026-11-03 when credit ran out (reports
-      37 and 38, marked `failed` by hand; 36 lost six sections). Generation should fail the job and
-      keep the previous report. `[code]`
+- [x] **A report whose model calls all fail is saved as `complete`**: fixed 2026-11-05 (ADR-0056),
+      see "Done". `[code]`
+- [ ] **A report with only some sections failed is still saved as `complete`**, and those sections
+      read as "insufficient evidence" (report 36 lost six of twelve on 2026-11-03). Its failed
+      sections should be named as failures and the previous report kept or merged (ADR-0056). `[code]`
 - [ ] **Starting Celery beat locally embeds the whole backlog**: overdue jobs fire at once, and
       `EMBED_EXHIBITS` defaults to true, so proxies and press releases are embedded too (about 14,000
       chunks in the dev DB). The paid-twice part is fixed (see "Done", 2026-11-04); the dev `.env` now
@@ -109,8 +109,7 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       MSFT, AMZN, TSLA, GOOGL (multi-class shares), META, V, MA (§4.1). `[code]`
 - [x] **News is sample data**: fixed in the dev database, see "Done", 2026-11-02. The fixtures,
       eval report and public demo stay synthetic on purpose.
-- [ ] **News runs fail when the embedding call fails**: 18 of 84 runs, including NVDA's and AAPL's
-      latest (2026-10-30). `[code]`
+- [x] **News runs fail when the embedding call fails**: fixed 2026-11-05, see "Done". `[code]`
 - [ ] **New SEC filings arrive only when ingestion is run by hand** locally. Prices catch up at
       API start; filings have no equivalent. `[code]`
 - [ ] Prices refresh only at API start, and the check is "older than 12 hours", not "has the
@@ -585,4 +584,18 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - 2026-11-04 — **CI's Trivy scan installs again**: the official install script downloads from
   `get.trivy.dev`, which stopped resolving (aquasecurity/trivy#11537, closed as not planned), so
   `build-images` failed on every push. CI now downloads the pinned release tarball from GitHub and
-  checks it against the release's checksums.
+  checks it against the release's checksums. Not yet confirmed in CI: GitHub Actions has been
+  locked by an account billing issue since 2026-11-05, so no job has started.
+- 2026-11-05 — **An outage no longer replaces the latest report** (ADR-0056): when the model
+  provider refuses every section (the 402s of 2026-11-03), `generate_report` raises
+  `ReportGenerationError` before saving anything, so the job fails and the previous report stays the
+  company's latest. A section whose model call raised is now marked `failed`, apart from one the
+  model answered with nothing citable.
+- 2026-11-05 — **Chat news matches the News tab**: the `get_recent_news` tool returned every recent
+  article, including passing mentions that reports and the News tab leave out; it now uses the same
+  `news_relevance_threshold`. The repository's unfiltered `get_recent_news` had no callers left and
+  was removed.
+- 2026-11-05 — **A refused embedding no longer loses a news run**: headline embeddings only group
+  near-duplicates, yet one failed call dead-lettered the run with all its articles (64 runs from
+  2026-10-29 to 2026-11-04, every one an embedding 429 or 402). The run now saves the articles,
+  groups identical headlines only, logs `news.cluster.skipped` and records `clustering: "skipped"`.
