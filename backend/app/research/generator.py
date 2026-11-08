@@ -61,6 +61,7 @@ class SectionGeneration:
     items: list[Item]
     verified: VerifiedOutput
     insufficient: bool
+    failed: bool = False  # the model call raised on its last attempt: an outage, not "no evidence"
 
 
 def _context(payload: dict[str, Any], evidence: Sequence[EvidenceItem]) -> str:
@@ -144,8 +145,12 @@ def _call(
     *,
     session: Session | None = None,
     user_id: int | None = None,
-) -> dict[str, Any]:
-    """Call the model; on a shape failure allow exactly one repair attempt (§17.2)."""
+) -> dict[str, Any] | None:
+    """Call the model; on a shape failure allow exactly one repair attempt (§17.2).
+
+    None means the repair call itself raised (an outage, a refused key), not a reply in the wrong
+    shape, so the caller can tell a failed section from one with nothing to say.
+    """
     strong = get_settings().llm_model_strong
     try:
         raw = _logged_complete_json(
@@ -180,7 +185,7 @@ def _call(
             section=section,
         )
     except Exception:
-        return {}
+        return None
 
 
 def _extract(section: str, raw: dict[str, Any]) -> list[Item]:
@@ -254,7 +259,7 @@ def generate_section(
         LLMMessage("user", _context(payload, evidence)),
     ]
     raw = _call(llm, messages, _schema(section), section, session=session, user_id=user_id)
-    items = _extract(section, raw)
+    items = _extract(section, raw or {})
 
     raw_claims = []
     for i, it in enumerate(items):
@@ -264,7 +269,9 @@ def generate_section(
             raw_claims.append(RawClaim(claim_id=f"{section}_{i}", text=text, source_ids=ids))
     verified = verify_claims(raw_claims, ev_index, settings=settings, entailer=entailer)
     accepted = [c for c in verified.claims if c.status in ("accepted", "softened")]
-    return SectionGeneration(items=items, verified=verified, insufficient=not accepted)
+    return SectionGeneration(
+        items=items, verified=verified, insufficient=not accepted, failed=raw is None
+    )
 
 
 def accepted_by_index(verified: VerifiedOutput) -> dict[int, VerifiedClaim]:

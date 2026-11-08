@@ -59,6 +59,11 @@ logger = get_logger(__name__)
 
 _SECTION_WORKERS = 6  # how many model calls may be in flight; the provider client paces them
 
+
+class ReportGenerationError(RuntimeError):
+    """No section could be generated (the model provider refused every call); nothing is saved."""
+
+
 _RISK_CATEGORIES = set(get_args(Risk.model_fields["category"].annotation))
 _MGMT_TOPICS = set(get_args(ManagementTopicStatement.model_fields["topic"].annotation))
 
@@ -181,10 +186,12 @@ def _news_evidence(session: Session, company_id: int, *, settings: Settings) -> 
 
 
 def _empty_generation() -> SectionGeneration:
+    """What a section that raised becomes: empty, and marked failed rather than lacking evidence."""
     return SectionGeneration(
         items=[],
         verified=VerifiedOutput(rendered_text="", claims=[], citations=[]),
         insufficient=True,
+        failed=True,
     )
 
 
@@ -287,6 +294,12 @@ def generate_report(
             insufficient.append(section)
         for c in gen.verified.citations:
             citations.setdefault(c.source_id, c)
+    if all(gen.failed for gen in sections.values()):
+        # Saving an empty report as complete would replace the latest good one (ERR-002).
+        log_event(logger, logging.ERROR, "report.all_sections_failed", ticker=company.ticker)
+        raise ReportGenerationError(
+            f"every section's model call failed for {company.ticker}; the previous report is kept"
+        )
 
     report = _assemble(sections)
     _annotate_risk_changes(session, report.risks, llm=llm, settings=settings, user_id=user_id)
