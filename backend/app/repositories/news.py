@@ -64,20 +64,6 @@ def list_news(
     return list(session.scalars(stmt))
 
 
-def get_recent_news(
-    session: Session, *, company_id: int, since: datetime, limit: int = 20
-) -> list[News]:
-    """Recent news for a company, newest first (RAG-031). `since` is an aware UTC datetime."""
-    return list(
-        session.scalars(
-            select(News)
-            .where(News.company_id == company_id, News.published_at >= since)
-            .order_by(News.published_at.desc())
-            .limit(limit)
-        )
-    )
-
-
 def recent_since(days: int, *, now: datetime) -> datetime:
     """UTC cutoff `days` before `now` (kept here so the SQL boundary lives with the query)."""
     return now - timedelta(days=days)

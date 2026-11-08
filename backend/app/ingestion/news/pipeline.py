@@ -30,6 +30,7 @@ from app.repositories.filings import get_or_create_document
 from app.repositories.freshness import record_freshness
 from app.repositories.ingestion import dead_letter, finish_run, start_run
 from app.utils.dates import months_ago
+from app.utils.http import HttpClientError
 from app.utils.logging import get_logger, log_event
 
 logger = get_logger(__name__)
@@ -41,6 +42,7 @@ EmbedFn = Callable[[list[str]], list[list[float]]]
 class NewsCounts:
     ingested: int = 0
     clusters: int = 0
+    clustering: str = "embedded"
 
 
 def _default_embed_fn() -> EmbedFn:
@@ -75,7 +77,8 @@ def ingest_news(
     try:
         start = months_ago(today, max(1, settings.news_backfill_days // 30))
         articles = list(source.get_news(company.ticker, start=start, end=today))
-        counts.clusters = _ingest_articles(session, company, articles, embed_fn, settings)
+        counts.clusters, skipped = _ingest_articles(session, company, articles, embed_fn, settings)
+        counts.clustering = "skipped" if skipped else "embedded"
         counts.ingested = len(articles)
         record_freshness(
             session,
@@ -89,7 +92,11 @@ def ingest_news(
             session,
             run,
             status="success",
-            counts={"ingested": counts.ingested, "clusters": counts.clusters},
+            counts={
+                "ingested": counts.ingested,
+                "clusters": counts.clusters,
+                "clustering": counts.clustering,  # "skipped" when the embedding call failed
+            },
         )
     except Exception as exc:  # ING-005
         dead_letter(
@@ -120,11 +127,24 @@ def _ingest_articles(
     articles: list[NewsArticle],
     embed_fn: EmbedFn,
     settings: Settings,
-) -> int:
+) -> tuple[int, bool]:
+    """Persist the articles; return (event clusters, whether near-duplicate grouping was off)."""
     if not articles:
-        return 0
+        return 0, False
     hashes = [content_hash(a.title) for a in articles]
-    embeddings = embed_fn([a.title for a in articles])
+    embeddings: list[list[float]] | None
+    try:
+        embeddings = embed_fn([a.title for a in articles])
+    except HttpClientError as exc:  # grouping is an extra: keep the news, group exact copies only
+        embeddings = None
+        log_event(
+            logger,
+            logging.WARNING,
+            "news.cluster.skipped",
+            ticker=company.ticker,
+            articles=len(articles),
+            error=str(exc),
+        )
     cluster_ids = cluster_articles(
         [ClusterInput(h, a.published_at) for h, a in zip(hashes, articles, strict=True)],
         embeddings,
@@ -160,7 +180,7 @@ def _ingest_articles(
             ),
             event_cluster_id=cluster_id,
         )
-    return len(set(cluster_ids))
+    return len(set(cluster_ids)), embeddings is None
 
 
 def ingest_news_for_tickers(

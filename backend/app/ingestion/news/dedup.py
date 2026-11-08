@@ -53,12 +53,15 @@ class _UnionFind:
 
 def cluster_articles(
     items: list[ClusterInput],
-    embeddings: Sequence[Sequence[float]],
+    embeddings: Sequence[Sequence[float]] | None,
     *,
     cosine_threshold: float,
     window_days: int,
 ) -> list[str]:
-    """Return an `event_cluster_id` per item (same id == same event)."""
+    """Return an `event_cluster_id` per item (same id == same event).
+
+    With no `embeddings` (the embedding call failed) only identical headlines are grouped.
+    """
     n = len(items)
     uf = _UnionFind(n)
     window = timedelta(days=window_days)
@@ -67,7 +70,9 @@ def cluster_articles(
             same_hash = items[i].content_hash == items[j].content_hash
             within_window = abs(items[i].published_at - items[j].published_at) <= window
             if same_hash or (
-                within_window and _cosine(embeddings[i], embeddings[j]) >= cosine_threshold
+                embeddings is not None
+                and within_window
+                and _cosine(embeddings[i], embeddings[j]) >= cosine_threshold
             ):
                 uf.union(i, j)
     # Name each cluster by the content hash of its earliest-published member (stable).

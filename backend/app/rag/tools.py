@@ -18,6 +18,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -143,7 +144,13 @@ def calculate_growth(
 def get_recent_news(session: Session, ticker: str, days: int = 30) -> dict[str, Any]:
     c = _company_or_raise(session, ticker)
     since = news_repo.recent_since(days, now=datetime.now(UTC))
-    rows = news_repo.get_recent_news(session, company_id=c.id, since=since)
+    rows = news_repo.list_news(  # the News tab's threshold, so passing mentions stay out (§10.8)
+        session,
+        company_id=c.id,
+        from_dt=since,
+        min_relevance=Decimal(str(get_settings().news_relevance_threshold)),
+        limit=20,
+    )
     return {
         "items": [
             {
