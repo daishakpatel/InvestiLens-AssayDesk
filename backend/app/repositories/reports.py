@@ -74,6 +74,33 @@ def finish_report(
     report.latency_ms = latency_ms
 
 
+def copy_sources(
+    session: Session, *, from_report_id: int, to_report_id: int, source_ids: set[str]
+) -> int:
+    """Copy an earlier report's stored sources among `source_ids` (carried over, ADR-0057)."""
+    rows = session.scalars(
+        select(ResearchSource).where(
+            ResearchSource.report_id == from_report_id, ResearchSource.source_id.in_(source_ids)
+        )
+    ).all()
+    session.add_all(
+        ResearchSource(
+            report_id=to_report_id,
+            source_id=r.source_id,
+            source_type=r.source_type,
+            citation_text=r.citation_text,
+            url=r.url,
+            page=r.page,
+            section_path=r.section_path,
+            char_start=r.char_start,
+            char_end=r.char_end,
+            tier=r.tier,
+        )
+        for r in rows
+    )
+    return len(rows)
+
+
 def record_sources(session: Session, report_id: int, citations: list[Citation]) -> int:
     """Persist the report's cited sources (CIT-001). Returns the count."""
     rows = [

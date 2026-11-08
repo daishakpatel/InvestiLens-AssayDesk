@@ -74,10 +74,10 @@ class Settings(BaseSettings):
     # Blended $/1M tokens for cost logging (EMB-002). Voyage voyage-finance-2 list price; an
     # estimate used only for the `llm_calls` cost column, never for financial output.
     embedding_cost_per_1m_tokens: Decimal = Field(default=Decimal("0.12"))
-    # FR-EX-013: embed EX-99 press releases and proxy statements too. A DEF 14A is ~1-2k chunks
-    # (about $0.10-0.30 a filing at Gemini's embedding price), so a cost-sensitive deployment
-    # turns this off and those documents stay keyword-searchable only.
-    embed_exhibits: bool = Field(default=True)
+    # FR-EX-013: embed EX-99 press releases and proxy statements too. Off by default (ADR-0058): a
+    # DEF 14A is ~1-2k chunks (about $0.10-0.30 a filing at Gemini's embedding price), and the
+    # first beat run on a fresh setup would embed the whole backlog. Off, they stay keyword-only.
+    embed_exhibits: bool = Field(default=False)
     # HNSW query-time breadth (EMB-004). Higher = better recall, slower. Tuned in docs/rag.md.
     hnsw_ef_search: int = Field(default=100)
 

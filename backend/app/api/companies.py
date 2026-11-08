@@ -223,8 +223,13 @@ def get_financials(
                 formula=formula,
             )
         )
+    cmap = load_concept_map(ticker=company.ticker, cik=company.cik, sector=company.sector)
     series = [
-        MetricSeries(metric_name=name, points=by_name.get(name, [])[-keep if keep else 0 :])
+        MetricSeries(
+            metric_name=name,
+            points=by_name.get(name, [])[-keep if keep else 0 :],
+            applicable=cmap.applies(name),
+        )
         for name in names
     ]
     return FinancialsResponse(

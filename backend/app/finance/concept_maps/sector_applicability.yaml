@@ -21,6 +21,15 @@ sectors:
     roic: false               # deposits are funding, not invested capital
     current_ratio: false
     ev_ebitda: false
+    # No operating-income line (net revenue, noninterest expense, pretax income) and no capex tag
+    # (investing outflows are securities): these and the ratios built on them are N/A, not missing.
+    operating_income: false
+    operating_margin: false
+    ebitda: false
+    capex: false
+    free_cash_flow: false
+    fcf_margin: false
+    capex_intensity: false
     piotroski: false
     altman: false
     # Beneish was estimated on non-financial firms; banks were excluded (ADR-0042, DR-EQ-001).

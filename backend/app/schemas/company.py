@@ -47,6 +47,7 @@ class MetricSeriesPoint(BaseModel):
 class MetricSeries(BaseModel):
     metric_name: str
     points: list[MetricSeriesPoint]
+    applicable: bool = True  # false: N/A for the company's sector (DR-042), not a missing value
 
 
 class FinancialsResponse(BaseModel):

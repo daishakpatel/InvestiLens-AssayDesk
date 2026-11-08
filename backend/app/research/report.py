@@ -2,8 +2,9 @@
 
 Converges Phase 1c metrics, Phase 1e news, Phase 2c retrieval, and Phase 3a verification into a
 `ResearchReport`. Each section is an independent, verified LLM call over its own evidence subset;
-a section that fails or yields zero verified claims is marked `insufficient_evidence_sections`
-rather than failing the whole report. Every row records `model`, `prompt_version`, and
+a section that yields zero verified claims is marked `insufficient_evidence_sections`, and one
+whose model call failed is filled from the previous report or marked `failed_sections`
+(ADR-0057), rather than failing the whole report. Every row records `model`, `prompt_version`, and
 `data_version` (a hash of the metric + document set) for reproducibility (NFR-010).
 """
 
@@ -22,6 +23,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, get_args
 
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -45,6 +47,7 @@ from app.research.payloads import build_payload
 from app.research.prompts import REPORT_PROMPT_VERSION
 from app.schemas.citations import Citation, VerifiedOutput
 from app.schemas.research import (
+    CarriedOverSections,
     Factor,
     ManagementTopicStatement,
     NewsItemSummary,
@@ -290,7 +293,7 @@ def generate_report(
     for (section, _, _), future in zip(jobs, futures, strict=True):
         gen = future.result()
         sections[section] = gen
-        if gen.insufficient:
+        if gen.insufficient and not gen.failed:  # an outage is not a lack of evidence
             insufficient.append(section)
         for c in gen.verified.citations:
             citations.setdefault(c.source_id, c)
@@ -304,6 +307,17 @@ def generate_report(
     report = _assemble(sections)
     _annotate_risk_changes(session, report.risks, llm=llm, settings=settings, user_id=user_id)
     report.insufficient_evidence_sections = sorted(set(insufficient))
+    failed = [section for section, gen in sections.items() if gen.failed]
+    if failed:
+        log_event(
+            logger,
+            logging.WARNING,
+            "report.sections_failed",
+            ticker=company.ticker,
+            sections=failed,
+        )
+    carried_ids = _carry_over(session, company.id, report, failed)
+    evidence_ids |= carried_ids  # the report cites them, so they are part of its data version
     data_version = _data_version(evidence_ids)
 
     row = report_repo.create_report(
@@ -317,6 +331,13 @@ def generate_report(
     for gen in sections.values():
         persist_claims(session, gen.verified, report_id=row.id)
     report_repo.record_sources(session, row.id, list(citations.values()))
+    if report.carried_over is not None:
+        report_repo.copy_sources(
+            session,
+            from_report_id=int(report.carried_over.research_id),
+            to_report_id=row.id,
+            source_ids=carried_ids - citations.keys(),
+        )
     report_repo.finish_report(
         session,
         row,
@@ -325,6 +346,51 @@ def generate_report(
         latency_ms=int((time.monotonic() - started) * 1000),
     )
     return ReportResult(report=report, report_id=row.id, data_version=data_version)
+
+
+def _carry_over(
+    session: Session, company_id: int, report: ResearchReport, failed: list[str]
+) -> set[str]:
+    """Fill each failed section from the latest complete report, if it wrote one (ADR-0057).
+
+    Sets `failed_sections`/`carried_over` and returns the carried sections' source ids. A section
+    the previous report itself carried over stays failed: its content is older than that report's
+    date, which is the date the reader is shown.
+    """
+    report.failed_sections = failed
+    row = report_repo.get_latest_complete(session, company_id=company_id) if failed else None
+    if row is None or not row.report_json or row.generated_at is None:
+        return set()  # an undated report cannot be named as the source
+    try:
+        previous = ResearchReport.model_validate(row.report_json)
+    except ValidationError:  # an older report format: nothing safe to copy
+        log_event(logger, logging.WARNING, "report.carry_over.unreadable", research_id=row.id)
+        return set()
+    older = set(previous.carried_over.sections) if previous.carried_over else set()
+    carried = [s for s in failed if s not in older and getattr(previous, s)]
+    if not carried:
+        return set()
+    for section in carried:
+        setattr(report, section, getattr(previous, section))
+    report.failed_sections = [s for s in failed if s not in carried]
+    report.carried_over = CarriedOverSections(
+        research_id=str(row.id), generated_at=row.generated_at, sections=carried
+    )
+    log_event(
+        logger, logging.WARNING, "report.sections_carried_over", sections=carried, from_id=row.id
+    )
+    return _source_ids(previous.model_dump(mode="json", include=set(carried)))
+
+
+def _source_ids(value: Any) -> set[str]:
+    """Every id in a dumped report fragment's `source_ids` lists, at any depth."""
+    if isinstance(value, dict):
+        own = value.get("source_ids")
+        found = set(own) if isinstance(own, list) else set()
+        return found.union(*(_source_ids(v) for v in value.values()))
+    if isinstance(value, list):
+        return set().union(*(_source_ids(v) for v in value))
+    return set()
 
 
 def _annotate_risk_changes(
