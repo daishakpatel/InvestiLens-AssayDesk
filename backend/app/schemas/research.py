@@ -7,6 +7,7 @@ never rendered raw to the client.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -73,6 +74,14 @@ class NewsItemSummary(BaseModel):
     source_ids: list[str] = Field(min_length=1)
 
 
+class CarriedOverSections(BaseModel):
+    """Sections copied unchanged from an earlier report because their model call failed now."""
+
+    research_id: str
+    generated_at: datetime
+    sections: list[str]
+
+
 class ResearchReport(BaseModel):
     executive_summary: list[ResearchClaim]
     company_overview: list[ResearchClaim]
@@ -87,3 +96,7 @@ class ResearchReport(BaseModel):
     bull_factors: list[Factor]
     bear_factors: list[Factor]
     insufficient_evidence_sections: list[str] = []
+    # ADR-0057: sections whose model call failed in this run. A failed section is filled from the
+    # previous report when that report wrote it (`carried_over`), else listed in `failed_sections`.
+    failed_sections: list[str] = []
+    carried_over: CarriedOverSections | None = None

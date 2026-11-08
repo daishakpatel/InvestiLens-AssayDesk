@@ -268,7 +268,9 @@ function contentsOf(report: ResearchReport): Entry[] {
       : []),
     ...(cited(report.risks).length > 0 ? [{ id: "risks", title: "Risks" }] : []),
     { id: "management", title: "Management" },
-    ...(report.insufficient_evidence_sections.length > 0 ? [{ id: "not-covered", title: "Not covered" }] : []),
+    ...(report.insufficient_evidence_sections.length + report.failed_sections.length > 0
+      ? [{ id: "not-covered", title: "Not covered" }]
+      : []),
     { id: "references", title: "References" },
   ];
 }
@@ -284,7 +286,10 @@ export function ReportDocument({ envelope }: { envelope: ResearchReportEnvelope 
   const news = cited(report.news_summary);
   const bull = report.bull_factors.filter((factor) => cited(factor.claims).length > 0);
   const bear = report.bear_factors.filter((factor) => cited(factor.claims).length > 0);
-  const notCovered = report.insufficient_evidence_sections.map((key) => SECTION_NAMES[key] ?? words(key));
+  const named = (keys: readonly string[]) => keys.map((key) => SECTION_NAMES[key] ?? words(key));
+  const notCovered = named(report.insufficient_evidence_sections);
+  const failed = named(report.failed_sections);
+  const carried = report.carried_over;
 
   return (
     <div className="lg:grid lg:grid-cols-[180px_minmax(0,720px)] lg:gap-x-16">
@@ -317,6 +322,13 @@ export function ReportDocument({ envelope }: { envelope: ResearchReportEnvelope 
             Written by an AI model from {ticker}’s filings, reported figures and news. Every claim
             links to its source; where the evidence was not there, the section was left out.
           </p>
+          {carried && (
+            <p className="mt-2 max-w-xl text-sm text-muted">
+              The AI model could not be reached for {named(carried.sections).join(", ")}, so{" "}
+              {carried.sections.length === 1 ? "that section is" : "those sections are"} from the
+              report of {formatDate(carried.generated_at)}.
+            </p>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-x-1 text-caption text-subtle">
             <span>
               {[envelope.generated_at && `Generated ${formatDate(envelope.generated_at)}`, envelope.model]
@@ -418,13 +430,22 @@ export function ReportDocument({ envelope }: { envelope: ResearchReportEnvelope 
             </div>
           </DocSection>
 
-          {notCovered.length > 0 && (
+          {notCovered.length + failed.length > 0 && (
             <DocSection id="not-covered" title="Not covered">
               {/* Abstaining is the system working as designed, so it is stated, not styled as a fault. */}
-              <p className="text-body leading-relaxed text-muted">
-                Not enough evidence to write about: {notCovered.join(", ")}. Nothing was filled in
-                to cover the gap.
-              </p>
+              {notCovered.length > 0 && (
+                <p className="text-body leading-relaxed text-muted">
+                  Not enough evidence to write about: {notCovered.join(", ")}. Nothing was filled in
+                  to cover the gap.
+                </p>
+              )}
+              {/* An outage is not abstention (ADR-0057): say so, and that trying again may work. */}
+              {failed.length > 0 && (
+                <p className="text-body leading-relaxed text-muted">
+                  The AI model could not be reached for {failed.join(", ")}. Regenerate the report
+                  to try again.
+                </p>
+              )}
             </DocSection>
           )}
 

@@ -43,7 +43,7 @@ from app.research.payloads import build_payload
 from app.research.prompts import REPORT_PROMPT_VERSION
 from app.research.report import ReportGenerationError, _news_evidence, generate_report
 from app.utils.http import HttpClientError
-from tests.fakes import FakeLLM
+from tests.fakes import FakeLLM, _label
 
 _CHUNKS = [
     "Supply chain risk: reliance on a few foundry partners raised disruption exposure.",
@@ -315,6 +315,63 @@ def test_report_whose_model_calls_all_fail_is_not_saved(session: Session) -> Non
     assert session.scalar(reports) == before
     latest = report_repo.get_latest_complete(session, company_id=company.id)
     assert latest is not None and latest.id == good.report_id
+
+
+class _PartlyRefusingLLM(FakeLLM):
+    """Raises for the named sections only, as when the credit ran out mid-report (report 36)."""
+
+    def __init__(self, refused: set[str]) -> None:
+        super().__init__()
+        self._refused = refused
+
+    async def complete_json(
+        self, messages: Sequence[LLMMessage], *, model: str, schema: dict[str, Any], max_tokens: int
+    ) -> dict[str, Any]:
+        if _label(messages[0].content) in self._refused:
+            raise HttpClientError("402 Payment Required")
+        return await super().complete_json(
+            messages, model=model, schema=schema, max_tokens=max_tokens
+        )
+
+
+def test_failed_section_is_carried_over_from_the_previous_report(session: Session) -> None:
+    """ERR-002, FR-030 (ADR-0057): a section lost to an outage keeps the last report's version,
+    labelled with that report, and is not reported as lacking evidence."""
+    company = _seed_company(session, "CAR", gross_margin="0.71")
+    good = generate_report(session, company, llm=FakeLLM())
+    assert good.report.risks
+
+    partial = generate_report(session, company, llm=_PartlyRefusingLLM({"risks"}))
+
+    report = partial.report
+    assert report.risks == good.report.risks
+    assert report.carried_over is not None
+    assert report.carried_over.research_id == str(good.report_id)
+    assert report.carried_over.sections == ["risks"]
+    assert report.failed_sections == []
+    assert "risks" not in report.insufficient_evidence_sections
+    assert report.company_overview  # the sections that did generate are this run's
+    stored = set(
+        session.scalars(
+            select(ResearchSource.source_id).where(ResearchSource.report_id == partial.report_id)
+        )
+    )
+    assert {sid for risk in report.risks for sid in risk.source_ids} <= stored
+
+    # Carried content is not carried again: its date would then be wrong.
+    again = generate_report(session, company, llm=_PartlyRefusingLLM({"risks"}))
+    assert again.report.failed_sections == ["risks"] and again.report.risks == []
+
+
+def test_failed_section_without_a_previous_report_is_named_failed(session: Session) -> None:
+    """ERR-002 (ADR-0057): with nothing to carry over, an outage is named, not called abstention."""
+    company = _seed_company(session, "FST", gross_margin="0.71")
+    result = generate_report(session, company, llm=_PartlyRefusingLLM({"risks"}))
+    assert result.report.failed_sections == ["risks"]
+    assert result.report.carried_over is None
+    assert "risks" not in result.report.insufficient_evidence_sections
+    row = session.get(ResearchReport, result.report_id)
+    assert row is not None and row.status == "complete"
 
 
 def test_report_generation_blocked_over_ai_budget(session: Session) -> None:

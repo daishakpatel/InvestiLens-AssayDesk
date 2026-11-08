@@ -28,7 +28,8 @@ The open-work list behind it is [`Instructions/TODO.md`](../Instructions/TODO.md
   JPMorgan. The development database adds AMD and Intel. Any other ticker must be ingested first.
 - US SEC filers only. There are no IFRS filers, no foreign private issuers (20-F/6-K) and no
   non-US exchanges.
-- Banks get no gross margin, inventory turnover or similar industrial ratios. These are marked
+- Banks get no gross margin, operating income, capex, free cash flow, current ratio or similar
+  industrial figures (banks do not report them). These are marked
   "not applicable" by sector rules (DR-042). Bank-specific measures (net interest margin, CET1)
   are not computed.
 - Some filings parse imperfectly. Intel's filings have no "Item N" headings and are sectioned by
@@ -106,7 +107,6 @@ line when it is fixed.
 | Live-model eval (Recall@5, judge faithfulness, cost) not published | Open: needs a paid run | [21 — evaluation](../Instructions/21_phase5b_evaluation_framework.md) |
 | Load test never run against a deployed stack | Open | [22 — observability](../Instructions/22_phase5c_observability_and_security.md) |
 | Public demo not yet deployed | Open: ready, needs the owner's Render account | [37 — this phase](../Instructions/37_phase7l_measured_results_and_polish.md) |
-| A report with some sections failed is saved as complete; those sections read as "insufficient evidence" | Open | [14 — reports](../Instructions/14_phase3b_research_report_generation.md) |
 | No email delivery for verification and password reset | Open | [17 — auth](../Instructions/17_phase4b_auth_and_users.md) |
 
 ## How I'd validate this with a real analyst

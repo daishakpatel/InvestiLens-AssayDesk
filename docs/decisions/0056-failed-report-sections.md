@@ -30,5 +30,5 @@ report.
 ## Consequences
 
 A report with only some sections failed is still saved as `complete`, and those sections read as
-"insufficient evidence" (report 36 lost six of twelve). Naming them as failures, and keeping or
-merging the previous report, is open in `Instructions/TODO.md`.
+"insufficient evidence" (report 36 lost six of twelve). Resolved by ADR-0057: failed sections are
+named as failures and carried over from the previous report.

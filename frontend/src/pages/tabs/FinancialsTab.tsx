@@ -101,10 +101,14 @@ function MetricPanel({
 }) {
   const points = series?.points ?? [];
   const allNull = points.length > 0 && points.every((point) => toNumber(point.value) === null);
-  const reason = useMetricLineage(ticker, name, points.at(-1)?.period ?? "", allNull);
-  const emptyMessage = allNull
-    ? `${reasonText(reason.data?.warnings[0])}.`
-    : (note ?? `${metricLabel(name)} has not been reported in the filings we hold.`);
+  // Sector N/A (a bank's operating income) is known without asking the API why (DR-042).
+  const notApplicable = series?.applicable === false && (points.length === 0 || allNull);
+  const reason = useMetricLineage(ticker, name, points.at(-1)?.period ?? "", allNull && !notApplicable);
+  const emptyMessage = notApplicable
+    ? `${reasonText("NOT_APPLICABLE_SECTOR")}.`
+    : allNull
+      ? `${reasonText(reason.data?.warnings[0])}.`
+      : (note ?? `${metricLabel(name)} has not been reported in the filings we hold.`);
   return (
     <MetricChart
       name={name}

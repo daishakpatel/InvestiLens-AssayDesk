@@ -52,13 +52,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       generated earlier keep their old IDs, which still do not resolve. `[code]`
 - [x] **A report whose model calls all fail is saved as `complete`**: fixed 2026-11-05 (ADR-0056),
       see "Done". `[code]`
-- [ ] **A report with only some sections failed is still saved as `complete`**, and those sections
-      read as "insufficient evidence" (report 36 lost six of twelve on 2026-11-03). Its failed
-      sections should be named as failures and the previous report kept or merged (ADR-0056). `[code]`
-- [ ] **Starting Celery beat locally embeds the whole backlog**: overdue jobs fire at once, and
-      `EMBED_EXHIBITS` defaults to true, so proxies and press releases are embedded too (about 14,000
-      chunks in the dev DB). The paid-twice part is fixed (see "Done", 2026-11-04); the dev `.env` now
-      sets `EMBED_EXHIBITS=false`, but the default still embeds them on a fresh setup. `[code]`
+- [x] **A report with only some sections failed is still saved as `complete`**: fixed 2026-11-07
+      (ADR-0057), see "Done". `[code]`
+- [x] **Starting Celery beat locally embeds the whole backlog**: `EMBED_EXHIBITS` defaults to false
+      since 2026-11-07 (ADR-0058), see "Done". Beat still fires overdue jobs at once, so filings
+      themselves are embedded on first start, as intended. `[code]`
 - [ ] Comparison commentary and filing-diff adjudication have never run on a real model. `[notes]`
 
 ### Measured numbers (§36 #20)
@@ -599,3 +597,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   near-duplicates, yet one failed call dead-lettered the run with all its articles (64 runs from
   2026-10-29 to 2026-11-04, every one an embedding 429 or 402). The run now saves the articles,
   groups identical headlines only, logs `news.cluster.skipped` and records `clustering: "skipped"`.
+- 2026-11-07 — **A partly failed report keeps the last good sections** (ADR-0057): a section whose
+  model call failed was listed as "insufficient evidence" (report 36 lost six of twelve). It is now
+  copied from the latest complete report, with that report's id and date in `carried_over` and its
+  sources copied too, and the report page says which sections are from which date. With nothing to
+  copy it is listed in `failed_sections`, and the page says the model could not be reached.
+- 2026-11-07 — **Exhibits are not embedded by default** (ADR-0058): `EMBED_EXHIBITS` now defaults to
+  false, so the first beat run on a fresh setup no longer embeds every proxy and press release
+  (about 14,000 chunks in the dev DB). Set it true to put them in vector search.

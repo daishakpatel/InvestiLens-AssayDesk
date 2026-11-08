@@ -214,6 +214,23 @@ def test_financials_real_values(client: TestClient, seed: dict[str, int]) -> Non
     assert Decimal("130497000000") in values  # exact Decimal, not faked
 
 
+def test_financials_mark_sector_inapplicable_series(
+    client: TestClient, session: Session, seed: dict[str, int]
+) -> None:
+    """DR-042: a bank's operating income is N/A for its sector, not an unreported value."""
+    session.add(Company(ticker="BNK", cik="0000000099", name="Bank Corp", sector="Banks"))
+    session.flush()
+    params = {"metrics": "operating_income,free_cash_flow,revenue"}
+    bank = client.get(f"{_P}/companies/BNK/financials", params=params).json()["series"]
+    assert {s["metric_name"]: s["applicable"] for s in bank} == {
+        "operating_income": False,
+        "free_cash_flow": False,
+        "revenue": True,
+    }
+    tech = client.get(f"{_P}/companies/TST/financials", params=params).json()["series"]
+    assert all(s["applicable"] for s in tech)
+
+
 def test_financials_split_adjust_per_share_history(
     client: TestClient, seed: dict[str, int], session: Session
 ) -> None:

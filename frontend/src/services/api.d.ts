@@ -1696,6 +1696,21 @@ export interface components {
              */
             status: "scheduled" | "reported" | "unknown";
         };
+        /**
+         * CarriedOverSections
+         * @description Sections copied unchanged from an earlier report because their model call failed now.
+         */
+        CarriedOverSections: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Research Id */
+            research_id: string;
+            /** Sections */
+            sections: string[];
+        };
         /** ChangedPassage */
         ChangedPassage: {
             /** Heading */
@@ -3193,6 +3208,11 @@ export interface components {
         };
         /** MetricSeries */
         MetricSeries: {
+            /**
+             * Applicable
+             * @default true
+             */
+            applicable: boolean;
             /** Metric Name */
             metric_name: string;
             /** Points */
@@ -3984,12 +4004,18 @@ export interface components {
             bear_factors: components["schemas"]["Factor"][];
             /** Bull Factors */
             bull_factors: components["schemas"]["Factor"][];
+            carried_over?: components["schemas"]["CarriedOverSections"] | null;
             /** Cash Flow Analysis */
             cash_flow_analysis: components["schemas"]["ResearchClaim"][];
             /** Company Overview */
             company_overview: components["schemas"]["ResearchClaim"][];
             /** Executive Summary */
             executive_summary: components["schemas"]["ResearchClaim"][];
+            /**
+             * Failed Sections
+             * @default []
+             */
+            failed_sections: string[];
             /**
              * Insufficient Evidence Sections
              * @default []

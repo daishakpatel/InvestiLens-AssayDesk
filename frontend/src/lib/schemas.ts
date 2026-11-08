@@ -109,7 +109,14 @@ const metricPoint = z.object({
 const financials = z.object({
   ticker: z.string(),
   period_type: z.string(),
-  series: z.array(z.object({ metric_name: z.string(), points: z.array(metricPoint) })),
+  series: z.array(
+    z.object({
+      metric_name: z.string(),
+      points: z.array(metricPoint),
+      // false: N/A for the company's sector (DR-042), e.g. a bank's operating income.
+      applicable: z.boolean().default(true),
+    }),
+  ),
   freshness,
 });
 
@@ -485,6 +492,11 @@ const report = z.object({
   bull_factors: z.array(factor),
   bear_factors: z.array(factor),
   insufficient_evidence_sections: z.array(z.string()).default([]),
+  // ADR-0057: sections whose model call failed, either copied from an earlier report or left empty.
+  failed_sections: z.array(z.string()).default([]),
+  carried_over: z
+    .object({ research_id: z.string(), generated_at: z.string(), sections: z.array(z.string()) })
+    .nullish(),
 });
 const researchEnvelope = z.object({
   research_id: z.string(),

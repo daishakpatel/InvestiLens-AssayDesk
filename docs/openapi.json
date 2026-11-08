@@ -457,6 +457,34 @@
         "title": "CalendarEvent",
         "type": "object"
       },
+      "CarriedOverSections": {
+        "description": "Sections copied unchanged from an earlier report because their model call failed now.",
+        "properties": {
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "research_id": {
+            "title": "Research Id",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "research_id",
+          "generated_at",
+          "sections"
+        ],
+        "title": "CarriedOverSections",
+        "type": "object"
+      },
       "ChangedPassage": {
         "properties": {
           "heading": {
@@ -5051,6 +5079,11 @@
       },
       "MetricSeries": {
         "properties": {
+          "applicable": {
+            "default": true,
+            "title": "Applicable",
+            "type": "boolean"
+          },
           "metric_name": {
             "title": "Metric Name",
             "type": "string"
@@ -7427,6 +7460,16 @@
             "title": "Bull Factors",
             "type": "array"
           },
+          "carried_over": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CarriedOverSections"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "cash_flow_analysis": {
             "items": {
               "$ref": "#/components/schemas/ResearchClaim"
@@ -7446,6 +7489,14 @@
               "$ref": "#/components/schemas/ResearchClaim"
             },
             "title": "Executive Summary",
+            "type": "array"
+          },
+          "failed_sections": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed Sections",
             "type": "array"
           },
           "insufficient_evidence_sections": {

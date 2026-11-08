@@ -23,6 +23,7 @@ const emptyReport: ResearchReport = {
   bull_factors: [],
   bear_factors: [],
   insufficient_evidence_sections: [],
+  failed_sections: [],
 };
 
 describe("buildNumbering (CIT-006 first-appearance ordering)", () => {
