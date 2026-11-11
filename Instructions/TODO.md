@@ -131,8 +131,9 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ### Report-level features (§10.16)
 
-- [ ] `GET /research/{id}/export` is 501 (Markdown export and print are client-side only). `[code]`
-- [ ] `GET /research/{id}/diff` ("what changed since last report") is 501. `[code]`
+- [x] Export: stays client-side (Markdown + print); the 501 stub was removed, 2026-11-10 (ADR-0059).
+- [x] `GET /research/{id}/diff` ("what changed since last report"): built 2026-11-10 (ADR-0059),
+      see "Done". `[code]`
 - [ ] Shareable read-only links: not built. `[code]`
 - [ ] Rejected-claims admin view: not built (data is logged in `claim_verifications`). `[notes]`
 - [ ] `POST /feedback/report` is a 204 no-op (`backend/app/api/watchlist.py`). `[code]`
@@ -291,6 +292,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ## Done since the audit
 
+- 2026-11-10 — **Report diff** (ADR-0059): `GET /research/{id}/diff` compares a report with the
+  company's previous one (or `?against=`): claims per section matched by a shared cited source,
+  cited metrics by latest period with stored values, failed sections skipped. The report page
+  shows a "What changed" section. Export stays client-side; its 501 stub was removed.
 - 2026-10-12 — **CI green**: an "offline" contract test needed a seeded database; the guard test
   for ADR-0029 checked no routes and hid an `async` `/metrics` handler; a Dependabot major bump
   (TypeScript 7) broke `npm ci`; the pinned Trivy release had been deleted. Dependabot no longer
