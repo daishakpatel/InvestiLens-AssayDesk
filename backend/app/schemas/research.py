@@ -12,6 +12,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.company import MetricSeriesPoint
+
 EvidenceLabel = Literal["strongly_supported", "supported", "limited_evidence"]
 
 
@@ -100,3 +102,39 @@ class ResearchReport(BaseModel):
     # previous report when that report wrote it (`carried_over`), else listed in `failed_sections`.
     failed_sections: list[str] = []
     carried_over: CarriedOverSections | None = None
+
+
+class ReportDiffItem(BaseModel):
+    """A claim sharing no cited source with any claim of its section in the other report."""
+
+    text: str
+    source_ids: list[str] = Field(min_length=1)
+
+
+class ReportSectionChange(BaseModel):
+    section: str  # a ResearchReport field name, e.g. "revenue_analysis"
+    added: list[ReportDiffItem]  # in this report only
+    removed: list[ReportDiffItem]  # in the earlier report only
+
+
+class ReportMetricChange(BaseModel):
+    """The latest period of a metric each report cites, where the two differ (ADR-0059)."""
+
+    metric_name: str
+    period_type: str  # FY|Q|TTM|LATEST
+    before: MetricSeriesPoint | None  # None: the earlier report did not cite this metric
+    after: MetricSeriesPoint | None  # None: this report no longer cites it
+
+
+class ReportDiff(BaseModel):
+    """GET /research/{id}/diff: what changed since an earlier report (spec §10.16)."""
+
+    research_id: str
+    against_id: str
+    against_generated_at: datetime | None
+    data_version_changed: bool
+    prompt_version_changed: bool
+    sections: list[ReportSectionChange]  # only sections with a change
+    metrics: list[ReportMetricChange]
+    # Failed in either report (ADR-0056): an empty section is not a change, so not compared.
+    skipped_sections: list[str] = []

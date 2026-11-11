@@ -57,11 +57,6 @@ def _problem_response(request: Request, problem: Problem) -> JSONResponse:
     )
 
 
-def not_implemented(detail: str = "Not implemented in this phase") -> ProblemException:
-    """Stub helper for endpoints whose logic lands in a later phase."""
-    return ProblemException(501, "Not Implemented", detail)
-
-
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ProblemException)
     async def _handle_problem(request: Request, exc: ProblemException) -> JSONResponse:

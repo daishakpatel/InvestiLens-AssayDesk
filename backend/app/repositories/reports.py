@@ -33,6 +33,19 @@ def get_latest_complete(session: Session, *, company_id: int) -> ResearchReport 
     )
 
 
+def get_previous_complete(session: Session, report: ResearchReport) -> ResearchReport | None:
+    """The company's newest completed report created before `report` (ADR-0059)."""
+    return session.scalar(
+        select(ResearchReport)
+        .where(
+            ResearchReport.company_id == report.company_id,
+            ResearchReport.status == "complete",
+            ResearchReport.id < report.id,
+        )
+        .order_by(ResearchReport.id.desc())
+    )
+
+
 def create_report(
     session: Session,
     *,

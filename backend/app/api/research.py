@@ -16,7 +16,6 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id
-from app.api.errors import not_implemented
 from app.billing.budget import check_budget
 from app.config import get_settings
 from app.db import get_db
@@ -26,6 +25,7 @@ from app.repositories import companies as company_repo
 from app.repositories import jobs as job_repo
 from app.repositories import reports as report_repo
 from app.repositories import users as user_repo
+from app.research.diff import diff_reports
 from app.research.prompts import REPORT_PROMPT_VERSION
 from app.schemas.jobs import (
     JobState,
@@ -34,7 +34,7 @@ from app.schemas.jobs import (
     ResearchReportEnvelope,
     ResearchRequest,
 )
-from app.schemas.research import ResearchReport
+from app.schemas.research import ReportDiff, ResearchReport
 from app.utils.logging import get_logger, log_event
 
 router = APIRouter(prefix="/research", tags=["Research"])
@@ -177,10 +177,23 @@ def get_research(research_id: int, db: Session = _DB) -> ResearchReportEnvelope:
 
 
 def to_envelope(report: ResearchReportRow, ticker: str) -> ResearchReportEnvelope:
-    """The API envelope for a stored report; one that no longer validates is a logged 409."""
+    """The API envelope for a stored report."""
+    return ResearchReportEnvelope(
+        research_id=str(report.id),
+        ticker=ticker,
+        generated_at=report.generated_at.isoformat() if report.generated_at else None,
+        model=report.model,
+        prompt_version=report.prompt_version,
+        data_version=report.data_version,
+        report=report_body(report),
+    )
+
+
+def report_body(report: ResearchReportRow) -> ResearchReport:
+    """A stored report's body; one that no longer validates is a logged 409."""
     payload = report.report_json
     try:
-        body = ResearchReport.model_validate(payload) if payload else _empty_report()
+        return ResearchReport.model_validate(payload) if payload else _empty_report()
     except ValidationError as exc:
         # An older schema's report is unreadable, not a server error; the UI offers a new one.
         log_event(
@@ -195,22 +208,21 @@ def to_envelope(report: ResearchReportRow, ticker: str) -> ResearchReportEnvelop
             status.HTTP_409_CONFLICT,
             "the stored report no longer matches the current format; generate a new one",
         ) from exc
-    return ResearchReportEnvelope(
-        research_id=str(report.id),
-        ticker=ticker,
-        generated_at=report.generated_at.isoformat() if report.generated_at else None,
-        model=report.model,
-        prompt_version=report.prompt_version,
-        data_version=report.data_version,
-        report=body,
+
+
+@router.get("/{research_id}/diff", response_model=ReportDiff)
+def diff_research(research_id: int, against: int | None = None, db: Session = _DB) -> ReportDiff:
+    """What changed since an earlier report of the same company; by default the previous one."""
+    report = report_repo.get_report(db, research_id)
+    if report is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "report not found")
+    other = (
+        report_repo.get_previous_complete(db, report)
+        if against is None
+        else report_repo.get_report(db, against)
     )
-
-
-@router.get("/{research_id}/diff", response_model=None)
-def diff_research(research_id: str, against: str) -> None:
-    raise not_implemented("Research diff is a Phase 6 feature")
-
-
-@router.get("/{research_id}/export", response_model=None)
-def export_research(research_id: str, format: str = "pdf") -> None:
-    raise not_implemented("Report export lands in Phase 4d")
+    if other is None or other.company_id != report.company_id or other.id == report.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no earlier report of this company")
+    return diff_reports(
+        db, row=report, report=report_body(report), against_row=other, against=report_body(other)
+    )
