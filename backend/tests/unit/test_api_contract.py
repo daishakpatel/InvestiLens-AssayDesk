@@ -83,12 +83,12 @@ def test_search_resolves_before_ticker(client: TestClient) -> None:
 
 
 def test_error_uses_rfc7807_shape(client: TestClient) -> None:
-    resp = client.get(f"{API_V1_PREFIX}/research/1/diff", params={"against": "2"})  # 501 stub
-    assert resp.status_code == 501
+    resp = client.get(f"{API_V1_PREFIX}/no-such-route")  # routing 404: no DB touched
+    assert resp.status_code == 404
     assert resp.headers["content-type"] == "application/problem+json"
     body = resp.json()
-    assert body["status"] == 501
-    assert body["title"] == "Not Implemented"
+    assert body["status"] == 404
+    assert body["title"] == "Not Found"
     assert body["request_id"]  # API-007 populated in the problem body
 
 

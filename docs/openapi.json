@@ -7353,6 +7353,165 @@
         "title": "RegisterRequest",
         "type": "object"
       },
+      "ReportDiff": {
+        "description": "GET /research/{id}/diff: what changed since an earlier report (spec \u00a710.16).",
+        "properties": {
+          "against_generated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Against Generated At"
+          },
+          "against_id": {
+            "title": "Against Id",
+            "type": "string"
+          },
+          "data_version_changed": {
+            "title": "Data Version Changed",
+            "type": "boolean"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/ReportMetricChange"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "prompt_version_changed": {
+            "title": "Prompt Version Changed",
+            "type": "boolean"
+          },
+          "research_id": {
+            "title": "Research Id",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/ReportSectionChange"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "skipped_sections": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Skipped Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "research_id",
+          "against_id",
+          "against_generated_at",
+          "data_version_changed",
+          "prompt_version_changed",
+          "sections",
+          "metrics"
+        ],
+        "title": "ReportDiff",
+        "type": "object"
+      },
+      "ReportDiffItem": {
+        "description": "A claim sharing no cited source with any claim of its section in the other report.",
+        "properties": {
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Source Ids",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "source_ids"
+        ],
+        "title": "ReportDiffItem",
+        "type": "object"
+      },
+      "ReportMetricChange": {
+        "description": "The latest period of a metric each report cites, where the two differ (ADR-0059).",
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricSeriesPoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricSeriesPoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metric_name": {
+            "title": "Metric Name",
+            "type": "string"
+          },
+          "period_type": {
+            "title": "Period Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric_name",
+          "period_type",
+          "before",
+          "after"
+        ],
+        "title": "ReportMetricChange",
+        "type": "object"
+      },
+      "ReportSectionChange": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/ReportDiffItem"
+            },
+            "title": "Added",
+            "type": "array"
+          },
+          "removed": {
+            "items": {
+              "$ref": "#/components/schemas/ReportDiffItem"
+            },
+            "title": "Removed",
+            "type": "array"
+          },
+          "section": {
+            "title": "Section",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section",
+          "added",
+          "removed"
+        ],
+        "title": "ReportSectionChange",
+        "type": "object"
+      },
       "ResearchAccepted": {
         "description": "202 response when a research job is queued.",
         "properties": {
@@ -13779,6 +13938,7 @@
     },
     "/api/v1/research/{research_id}/diff": {
       "get": {
+        "description": "What changed since an earlier report of the same company; by default the previous one.",
         "operationId": "diff_research_api_v1_research__research_id__diff_get",
         "parameters": [
           {
@@ -13787,16 +13947,23 @@
             "required": true,
             "schema": {
               "title": "Research Id",
-              "type": "string"
+              "type": "integer"
             }
           },
           {
             "in": "query",
             "name": "against",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Against",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Against"
             }
           }
         ],
@@ -13804,7 +13971,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDiff"
+                }
               }
             },
             "description": "Successful Response"
@@ -13821,56 +13990,6 @@
           }
         },
         "summary": "Diff Research",
-        "tags": [
-          "Research"
-        ]
-      }
-    },
-    "/api/v1/research/{research_id}/export": {
-      "get": {
-        "operationId": "export_research_api_v1_research__research_id__export_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "research_id",
-            "required": true,
-            "schema": {
-              "title": "Research Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "format",
-            "required": false,
-            "schema": {
-              "default": "pdf",
-              "title": "Format",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Export Research",
         "tags": [
           "Research"
         ]

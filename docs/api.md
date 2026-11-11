@@ -24,8 +24,8 @@ the frontend as a typed client (`frontend/src/services/api.d.ts`).
 
 > **Phase 4a status:** endpoints are wired to their real backing stores (companies/financials →
 > Phase 1, filings/news → 1a/1e, research/sources → Phase 3, chat → 3c). Features whose data is
-> not yet ingested return a clear empty/`404`/`501` (insiders/ownership P2, filing & research diff
-> Phase 6, export Phase 4d) rather than faked data. Auth is implemented in Phase 4b (see below).
+> not yet ingested return a clear empty/`404` (insiders/ownership P2) rather than faked data.
+> Report export is client-side (Markdown download, browser print; ADR-0059). Auth is implemented in Phase 4b (see below).
 
 ### Cross-cutting (Phase 4a)
 
@@ -122,8 +122,7 @@ the frontend as a typed client (`frontend/src/services/api.d.ts`).
 | GET | `/research/jobs/{job_id}/events` | SSE progress (API-004) |
 | GET | `/research/{research_id}` | Completed report (409 if it no longer matches the current report schema) |
 | GET | `/companies/{ticker}/research/latest` | Latest report (404 if none; 409 if it no longer matches the current schema) |
-| GET | `/research/{research_id}/diff?against=` | Report diff (P2, 501) |
-| GET | `/research/{research_id}/export?format=pdf\|md` | Export (Phase 4d, 501) |
+| GET | `/research/{research_id}/diff?against=` | What changed since an earlier report of the same company (`against` defaults to the previous completed one; 404 if none). Claims matched by shared cited source per section, cited metrics by latest period, failed sections skipped (ADR-0059) |
 
 ### Sources (citation modal)
 | Method | Path | Notes |

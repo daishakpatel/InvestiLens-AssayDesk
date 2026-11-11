@@ -1265,25 +1265,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Diff Research */
+        /**
+         * Diff Research
+         * @description What changed since an earlier report of the same company; by default the previous one.
+         */
         get: operations["diff_research_api_v1_research__research_id__diff_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/research/{research_id}/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Export Research */
-        get: operations["export_research_api_v1_research__research_id__export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3966,6 +3952,62 @@ export interface components {
              * @description Argon2id-hashed server-side (AUTH-001)
              */
             password: string;
+        };
+        /**
+         * ReportDiff
+         * @description GET /research/{id}/diff: what changed since an earlier report (spec §10.16).
+         */
+        ReportDiff: {
+            /** Against Generated At */
+            against_generated_at: string | null;
+            /** Against Id */
+            against_id: string;
+            /** Data Version Changed */
+            data_version_changed: boolean;
+            /** Metrics */
+            metrics: components["schemas"]["ReportMetricChange"][];
+            /** Prompt Version Changed */
+            prompt_version_changed: boolean;
+            /** Research Id */
+            research_id: string;
+            /** Sections */
+            sections: components["schemas"]["ReportSectionChange"][];
+            /**
+             * Skipped Sections
+             * @default []
+             */
+            skipped_sections: string[];
+        };
+        /**
+         * ReportDiffItem
+         * @description A claim sharing no cited source with any claim of its section in the other report.
+         */
+        ReportDiffItem: {
+            /** Source Ids */
+            source_ids: string[];
+            /** Text */
+            text: string;
+        };
+        /**
+         * ReportMetricChange
+         * @description The latest period of a metric each report cites, where the two differ (ADR-0059).
+         */
+        ReportMetricChange: {
+            after: components["schemas"]["MetricSeriesPoint"] | null;
+            before: components["schemas"]["MetricSeriesPoint"] | null;
+            /** Metric Name */
+            metric_name: string;
+            /** Period Type */
+            period_type: string;
+        };
+        /** ReportSectionChange */
+        ReportSectionChange: {
+            /** Added */
+            added: components["schemas"]["ReportDiffItem"][];
+            /** Removed */
+            removed: components["schemas"]["ReportDiffItem"][];
+            /** Section */
+            section: string;
         };
         /**
          * ResearchAccepted
@@ -7119,45 +7161,12 @@ export interface operations {
     };
     diff_research_api_v1_research__research_id__diff_get: {
         parameters: {
-            query: {
-                against: string;
-            };
-            header?: never;
-            path: {
-                research_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    export_research_api_v1_research__research_id__export_get: {
-        parameters: {
             query?: {
-                format?: string;
+                against?: number | null;
             };
             header?: never;
             path: {
-                research_id: string;
+                research_id: number;
             };
             cookie?: never;
         };
@@ -7169,7 +7178,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ReportDiff"];
                 };
             };
             /** @description Validation Error */

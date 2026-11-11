@@ -434,6 +434,74 @@ def test_invalid_stored_report_is_409_not_500(
         assert "generate a new one" in resp.json()["title"]
 
 
+def _report_json(revenue: list[tuple[str, str]], **extra: object) -> dict[str, object]:
+    """A minimal valid report whose revenue section cites (text, source_id) pairs."""
+    empty: dict[str, object] = {
+        key: []
+        for key in (
+            "executive_summary", "company_overview", "profitability_analysis",
+            "balance_sheet_analysis", "cash_flow_analysis", "valuation_analysis",
+            "news_summary", "risks", "management_commentary", "bull_factors", "bear_factors",
+        )
+    }  # fmt: skip
+    claims = [
+        {"claim_id": f"c{i}", "text": text, "source_ids": [sid]}
+        for i, (text, sid) in enumerate(revenue)
+    ]
+    return {**empty, "revenue_analysis": claims, **extra}
+
+
+def test_research_diff_against_previous_report(
+    client: TestClient, session: Session, seed: dict[str, int]
+) -> None:
+    """§10.16 "what changed since last report": claims by cited evidence, metrics by period."""
+    risk = {"category": "competitive", "description": "Rivals.", "source_ids": ["c_p1"]}
+    old = ResearchReport(
+        company_id=seed["company"],
+        status="complete",
+        generated_at=datetime(2026, 1, 1, tzinfo=UTC),
+        data_version="a",
+        prompt_version="report_v2",
+        report_json=_report_json(
+            [("Revenue was $60.9B.", "xbrl:TST:revenue:FY2024"),
+             ("Revenue was $27.0B.", "xbrl:TST:revenue:FY2023")],
+            risks=[risk],
+        ),
+    )  # fmt: skip
+    new = ResearchReport(
+        company_id=seed["company"],
+        status="complete",
+        generated_at=datetime(2026, 2, 1, tzinfo=UTC),
+        data_version="b",
+        prompt_version="report_v2",
+        # Reworded but citing the same source: unchanged. Risks failed: skipped, not "removed".
+        report_json=_report_json(
+            [("Sales reached $60.9B.", "xbrl:TST:revenue:FY2024"),
+             ("Revenue grew to $130.5B.", "xbrl:TST:revenue:FY2025")],
+            failed_sections=["risks"],
+        ),
+    )  # fmt: skip
+    session.add_all([old, new])
+    session.flush()
+
+    body = client.get(f"{_P}/research/{new.id}/diff").json()
+    assert body["against_id"] == str(old.id)
+    assert body["data_version_changed"] is True and body["prompt_version_changed"] is False
+    assert body["skipped_sections"] == ["risks"]
+    [section] = body["sections"]
+    assert section["section"] == "revenue_analysis"
+    assert [i["text"] for i in section["added"]] == ["Revenue grew to $130.5B."]
+    assert [i["text"] for i in section["removed"]] == ["Revenue was $27.0B."]
+    [metric] = body["metrics"]
+    assert (metric["metric_name"], metric["period_type"]) == ("revenue", "FY")
+    assert metric["before"]["period"] == "FY2024" and metric["after"]["period"] == "FY2025"
+    assert Decimal(metric["after"]["value"]) == Decimal(_REV[2025])
+
+    assert client.get(f"{_P}/research/{new.id}/diff", params={"against": old.id}).status_code == 200
+    assert client.get(f"{_P}/research/{old.id}/diff").status_code == 404  # nothing earlier
+    assert client.get(f"{_P}/research/{new.id}/diff", params={"against": new.id}).status_code == 404
+
+
 def test_watchlist_and_alert_crud_requires_auth(client: TestClient, seed: dict[str, int]) -> None:
     assert client.post(f"{_P}/watchlists", json={"name": "Tech"}).status_code == 401
     headers = auth_headers(seed["user"])
