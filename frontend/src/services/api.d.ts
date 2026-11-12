@@ -942,8 +942,7 @@ export interface paths {
         put?: never;
         /**
          * Report Feedback
-         * @description Report-level feedback. Persisting it needs a report_id the v1 contract does not carry;
-         *     stored feedback lands with the report UI (Phase 4d). Accepted as a no-op meanwhile.
+         * @description Thumbs up/down on a report or one of its claims, kept for evaluation (spec §18.5).
          */
         post: operations["report_feedback_api_v1_feedback_report_post"];
         delete?: never;
@@ -3989,6 +3988,23 @@ export interface components {
             text: string;
         };
         /**
+         * ReportFeedbackRequest
+         * @description POST /feedback/report: on the whole report, or on one claim of it (spec §18.5).
+         */
+        ReportFeedbackRequest: {
+            /** Claim Id */
+            claim_id?: string | null;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "up" | "down";
+            /** Reason */
+            reason?: string | null;
+            /** Report Id */
+            report_id: string;
+        };
+        /**
          * ReportMetricChange
          * @description The latest period of a metric each report cites, where the two differ (ADR-0059).
          */
@@ -6644,13 +6660,15 @@ export interface operations {
     report_feedback_api_v1_feedback_report_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["FeedbackRequest"];
+                "application/json": components["schemas"]["ReportFeedbackRequest"];
             };
         };
         responses: {

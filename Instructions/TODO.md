@@ -136,7 +136,8 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       see "Done". `[code]`
 - [ ] Shareable read-only links: not built. `[code]`
 - [ ] Rejected-claims admin view: not built (data is logged in `claim_verifications`). `[notes]`
-- [ ] `POST /feedback/report` is a 204 no-op (`backend/app/api/watchlist.py`). `[code]`
+- [x] `POST /feedback/report` stores ratings, 2026-11-11 (ADR-0060), see "Done". Claim-level ratings
+      are accepted by the API but the report page only offers the whole-report thumbs. `[code]`
 
 ### Deployment and tests
 
@@ -292,6 +293,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ## Done since the audit
 
+- 2026-11-11 — **Report feedback** (ADR-0060): `POST /feedback/report` stores a reader's thumbs
+  up/down (and optional reason) on a report or one claim in `report_feedback`, replacing their
+  earlier rating. The report page shows "Was this report useful?" to signed-in readers; the chat
+  and the report share one `Feedback` component.
 - 2026-11-10 — **Report diff** (ADR-0059): `GET /research/{id}/diff` compares a report with the
   company's previous one (or `?against=`): claims per section matched by a shared cited source,
   cited metrics by latest period with stored values, failed sections skipped. The report page

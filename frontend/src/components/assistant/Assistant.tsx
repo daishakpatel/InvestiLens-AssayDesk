@@ -1,13 +1,13 @@
-import { ArrowUp, Square, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, RefObject } from "react";
 import { Link } from "react-router-dom";
 
-import { apiRequest } from "../../lib/apiClient";
 import { useAuth } from "../../lib/auth";
 import { CitedText } from "../citations/CitedText";
 import { ReferenceList } from "../citations/ReferenceList";
 import { AiMark } from "../ui/AiMark";
+import { Feedback } from "../ui/Feedback";
 import { Badge } from "../ui/Badge";
 import { IconButton } from "../ui/Button";
 import { Spinner } from "../ui/Skeleton";
@@ -31,45 +31,6 @@ function Declined({ kind, text }: { kind: "abstained" | "refused"; text: string 
         {kind === "abstained" ? "Not enough evidence to answer" : "Outside what Assay Desk covers"}
       </p>
       <p className="mt-1 text-sm text-muted">{text}</p>
-    </div>
-  );
-}
-
-function Feedback({ messageId }: { messageId: string }) {
-  const [sent, setSent] = useState<"up" | "down" | null>(null);
-  const send = async (rating: "up" | "down") => {
-    setSent(rating);
-    try {
-      await apiRequest(`/chat/messages/${messageId}/feedback`, { method: "POST", body: { rating } });
-    } catch {
-      setSent(null); // not recorded: let the reader try again rather than thank them for nothing
-    }
-  };
-  return (
-    <div className="flex items-center gap-0.5">
-      <IconButton
-        size="sm"
-        label="Helpful"
-        aria-pressed={sent === "up"}
-        onClick={() => void send("up")}
-        className={sent === "up" ? "text-text" : ""}
-      >
-        <ThumbsUp aria-hidden className="size-3.5" />
-      </IconButton>
-      <IconButton
-        size="sm"
-        label="Not helpful"
-        aria-pressed={sent === "down"}
-        onClick={() => void send("down")}
-        className={sent === "down" ? "text-text" : ""}
-      >
-        <ThumbsDown aria-hidden className="size-3.5" />
-      </IconButton>
-      {sent && (
-        <span role="status" className="ml-1 text-caption text-subtle">
-          Thanks for the feedback.
-        </span>
-      )}
     </div>
   );
 }
@@ -155,7 +116,7 @@ function Answer({
       )}
 
       {message.done && !declined && !message.error && message.messageId && (
-        <Feedback messageId={message.messageId} />
+        <Feedback path={`/chat/messages/${message.messageId}/feedback`} />
       )}
 
       {isLatest && message.done && (message.suggested?.length ?? 0) > 0 && (
