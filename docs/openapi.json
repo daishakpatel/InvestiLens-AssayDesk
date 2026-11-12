@@ -2190,6 +2190,7 @@
           "reason": {
             "anyOf": [
               {
+                "maxLength": 2000,
                 "type": "string"
               },
               {
@@ -7440,6 +7441,52 @@
           "source_ids"
         ],
         "title": "ReportDiffItem",
+        "type": "object"
+      },
+      "ReportFeedbackRequest": {
+        "description": "POST /feedback/report: on the whole report, or on one claim of it (spec \u00a718.5).",
+        "properties": {
+          "claim_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Id"
+          },
+          "rating": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "report_id": {
+            "title": "Report Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rating",
+          "report_id"
+        ],
+        "title": "ReportFeedbackRequest",
         "type": "object"
       },
       "ReportMetricChange": {
@@ -13065,13 +13112,31 @@
     },
     "/api/v1/feedback/report": {
       "post": {
-        "description": "Report-level feedback. Persisting it needs a report_id the v1 contract does not carry;\nstored feedback lands with the report UI (Phase 4d). Accepted as a no-op meanwhile.",
+        "description": "Thumbs up/down on a report or one of its claims, kept for evaluation (spec \u00a718.5).",
         "operationId": "report_feedback_api_v1_feedback_report_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FeedbackRequest"
+                "$ref": "#/components/schemas/ReportFeedbackRequest"
               }
             }
           },

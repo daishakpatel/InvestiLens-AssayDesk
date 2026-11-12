@@ -186,7 +186,7 @@ but **may not** generate reports, use chat, or touch user-owned data (anonymous 
 | GET / POST | `/alerts` |
 | PATCH / DELETE | `/alerts/{id}` |
 | GET | `/notifications`, POST `/notifications/{id}/read` |
-| POST | `/feedback/report` |
+| POST | `/feedback/report` — signed in; body `{report_id, claim_id?, rating: up\|down, reason?}` (reason ≤ 2,000 chars). Stored in `report_feedback` as rating +1/−1, one row per reader per report or claim (rating again replaces it); 404 for an unknown report or a claim not in it; 204 on success (ADR-0060) |
 
 ### Investment theses (Phase 7k, FR-TH-013, ADR-0049)
 Signed-in only; every route is scoped to the caller, so another user's thesis, KPI, event or
