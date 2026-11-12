@@ -66,4 +66,12 @@ class ChatSession(BaseModel):
 
 class FeedbackRequest(BaseModel):
     rating: Literal["up", "down"]
-    reason: str | None = None
+    # Free text from the reader: bounded at the trust boundary, stored as data only.
+    reason: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
+
+
+class ReportFeedbackRequest(FeedbackRequest):
+    """POST /feedback/report: on the whole report, or on one claim of it (spec §18.5)."""
+
+    report_id: str
+    claim_id: str | None = None

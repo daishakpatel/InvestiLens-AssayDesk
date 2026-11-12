@@ -18,7 +18,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -34,6 +34,7 @@ from app.models import (
     IngestionRun,
     News,
     PriceHistory,
+    ReportFeedback,
     ResearchReport,
     User,
 )
@@ -500,6 +501,41 @@ def test_research_diff_against_previous_report(
     assert client.get(f"{_P}/research/{new.id}/diff", params={"against": old.id}).status_code == 200
     assert client.get(f"{_P}/research/{old.id}/diff").status_code == 404  # nothing earlier
     assert client.get(f"{_P}/research/{new.id}/diff", params={"against": new.id}).status_code == 404
+
+
+def test_report_feedback_is_stored_once_per_reader(
+    client: TestClient, session: Session, seed: dict[str, int]
+) -> None:
+    """§18.5: thumbs on a report or a claim, kept for evaluation; rating again replaces it."""
+    report = ResearchReport(
+        company_id=seed["company"],
+        status="complete",
+        report_json=_report_json([("Revenue was $60.9B.", "xbrl:TST:revenue:FY2024")]),
+    )
+    session.add(report)
+    session.flush()
+    url, h, rid = f"{_P}/feedback/report", auth_headers(seed["user"]), str(report.id)
+
+    assert client.post(url, json={"report_id": rid, "rating": "up"}).status_code == 401
+    assert (
+        client.post(url, json={"report_id": "999999", "rating": "up"}, headers=h).status_code == 404
+    )
+    bad_claim = {"report_id": rid, "claim_id": "nope", "rating": "down"}
+    assert client.post(url, json=bad_claim, headers=h).status_code == 404
+    too_long = {"report_id": rid, "rating": "down", "reason": "x" * 2001}
+    assert client.post(url, json=too_long, headers=h).status_code == 422
+
+    assert client.post(url, json={"report_id": rid, "rating": "up"}, headers=h).status_code == 204
+    again = {"report_id": rid, "rating": "down", "reason": " wrong period "}
+    assert client.post(url, json=again, headers=h).status_code == 204
+    claim = {"report_id": rid, "claim_id": "c0", "rating": "down"}
+    assert client.post(url, json=claim, headers=h).status_code == 204
+
+    rows = session.scalars(
+        select(ReportFeedback).where(ReportFeedback.report_id == report.id)
+    ).all()
+    by_claim = {row.claim_id: (row.rating, row.reason) for row in rows}
+    assert by_claim == {None: (-1, "wrong period"), "c0": (-1, None)}
 
 
 def test_watchlist_and_alert_crud_requires_auth(client: TestClient, seed: dict[str, int]) -> None:

@@ -19,6 +19,7 @@ from app.alerts.registry import AlertEventType as AlertEventTypeDef
 from app.api.deps import get_current_user_id
 from app.api.errors import ProblemException
 from app.api.pagination import NEXT_CURSOR_HEADER, clamp_limit, decode_cursor, encode_cursor
+from app.api.research import report_body
 from app.config import get_settings
 from app.db import get_db
 from app.models import Alert as AlertRow
@@ -26,8 +27,9 @@ from app.models import Company
 from app.repositories import alerts as alert_repo
 from app.repositories import companies as company_repo
 from app.repositories import notifications as notif_repo
+from app.repositories import reports as report_repo
 from app.repositories import watchlists as watchlist_repo
-from app.schemas.chat import FeedbackRequest
+from app.schemas.chat import ReportFeedbackRequest
 from app.schemas.common import FieldError
 from app.schemas.watchlist import (
     Alert,
@@ -238,8 +240,37 @@ def mark_notification_read(notification_id: int, db: Session = _DB, user_id: int
     db.commit()
 
 
+_CLAIM_SECTIONS = (
+    "executive_summary",
+    "company_overview",
+    "revenue_analysis",
+    "profitability_analysis",
+    "balance_sheet_analysis",
+    "cash_flow_analysis",
+    "valuation_analysis",
+)
+
+
 @router.post("/feedback/report", status_code=204, tags=["Feedback"])
-def report_feedback(body: FeedbackRequest) -> None:
-    """Report-level feedback. Persisting it needs a report_id the v1 contract does not carry;
-    stored feedback lands with the report UI (Phase 4d). Accepted as a no-op meanwhile."""
-    return None
+def report_feedback(body: ReportFeedbackRequest, db: Session = _DB, user_id: int = _USER) -> None:
+    """Thumbs up/down on a report or one of its claims, kept for evaluation (spec §18.5)."""
+    report = report_repo.get_report(db, int(body.report_id)) if body.report_id.isdigit() else None
+    if report is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "report not found")
+    if body.claim_id is not None:
+        content = report_body(report)
+        claims = {c.claim_id for name in _CLAIM_SECTIONS for c in getattr(content, name)}
+        claims |= {
+            c.claim_id for f in content.bull_factors + content.bear_factors for c in f.claims
+        }
+        if body.claim_id not in claims:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "claim not found in this report")
+    report_repo.set_feedback(
+        db,
+        user_id=user_id,
+        report_id=report.id,
+        claim_id=body.claim_id,
+        rating=1 if body.rating == "up" else -1,
+        reason=body.reason,
+    )
+    db.commit()

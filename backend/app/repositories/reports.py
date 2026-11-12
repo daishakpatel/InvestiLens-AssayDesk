@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import ResearchReport, ResearchSource
+from app.models import ReportFeedback, ResearchReport, ResearchSource
 from app.schemas.citations import Citation
 
 
@@ -44,6 +44,33 @@ def get_previous_complete(session: Session, report: ResearchReport) -> ResearchR
         )
         .order_by(ResearchReport.id.desc())
     )
+
+
+def set_feedback(
+    session: Session,
+    *,
+    user_id: int,
+    report_id: int,
+    claim_id: str | None,
+    rating: int,
+    reason: str | None,
+) -> ReportFeedback:
+    """One row per reader per report or claim: rating again replaces the earlier answer."""
+    row = session.scalar(
+        select(ReportFeedback).where(
+            ReportFeedback.user_id == user_id,
+            ReportFeedback.report_id == report_id,
+            ReportFeedback.claim_id.is_(None)
+            if claim_id is None
+            else ReportFeedback.claim_id == claim_id,
+        )
+    )
+    if row is None:
+        row = ReportFeedback(user_id=user_id, report_id=report_id, claim_id=claim_id)
+        session.add(row)
+    row.rating = rating
+    row.reason = reason
+    return row
 
 
 def create_report(

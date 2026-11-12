@@ -116,7 +116,7 @@ CONSTRAINTS:
 OUTPUT:
 1. The 3–5 bullet plan (before coding).
 2. The implementation, file by file.
-3. A summary of what changed and why, and any correctness bug you caught.
+3. A summary of what changed and why, and any correctness bug you caught.co
 4. The task's Definition of Done checklist, each item ✅/❌ with evidence (test name, query
    output, file path).
 5. Anything intentionally left out, with tradeoffs — added to the deferred-items backlog and
