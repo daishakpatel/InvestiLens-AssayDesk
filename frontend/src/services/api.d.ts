@@ -345,6 +345,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Questions
+         * @description The caller's past questions, newest first (§26.2); kept only as long as SEC-014 allows.
+         */
+        get: operations["list_my_questions_api_v1_chat_questions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/sessions/{session_id}": {
         parameters: {
             query?: never;
@@ -1612,6 +1632,20 @@ export interface components {
             params?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * AskedQuestion
+         * @description One question the reader asked (§26.2 saved questions), to ask again from the list.
+         */
+        AskedQuestion: {
+            /** Asked At */
+            asked_at: string;
+            /** Message Id */
+            message_id: string;
+            /** Question */
+            question: string;
+            /** Ticker */
+            ticker: string;
         };
         /**
          * AuthMessage
@@ -5568,6 +5602,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_questions_api_v1_chat_questions_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskedQuestion"][];
+                };
             };
             /** @description Validation Error */
             422: {

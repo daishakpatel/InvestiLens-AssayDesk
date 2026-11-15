@@ -64,6 +64,15 @@ class ChatSession(BaseModel):
     messages: list[ChatMessage] = []
 
 
+class AskedQuestion(BaseModel):
+    """One question the reader asked (§26.2 saved questions), to ask again from the list."""
+
+    message_id: str
+    ticker: str
+    question: str
+    asked_at: str
+
+
 class FeedbackRequest(BaseModel):
     rating: Literal["up", "down"]
     # Free text from the reader: bounded at the trust boundary, stored as data only.

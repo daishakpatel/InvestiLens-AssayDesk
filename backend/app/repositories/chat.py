@@ -14,7 +14,7 @@ from typing import Any
 from sqlalchemy import CursorResult, delete, select
 from sqlalchemy.orm import Session
 
-from app.models import ChatMessage, ChatSession
+from app.models import ChatMessage, ChatSession, Company
 
 
 def create_session(session: Session, *, user_id: int, company_id: int) -> ChatSession:
@@ -39,6 +39,24 @@ def recent_messages(session: Session, *, session_id: int, limit: int) -> list[Ch
         )
     )
     return list(reversed(rows))
+
+
+def questions_for_user(
+    session: Session, *, user_id: int, limit: int, before_id: int | None
+) -> list[tuple[ChatMessage, str]]:
+    """A reader's own questions with their tickers, newest first, keyset by message id (§26.2)."""
+    conditions = [ChatSession.user_id == user_id, ChatMessage.role == "user"]
+    if before_id is not None:
+        conditions.append(ChatMessage.id < before_id)
+    rows = session.execute(
+        select(ChatMessage, Company.ticker)
+        .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+        .join(Company, Company.id == ChatSession.company_id)
+        .where(*conditions)
+        .order_by(ChatMessage.id.desc())
+        .limit(limit)
+    )
+    return [(message, ticker) for message, ticker in rows.tuples()]
 
 
 def add_message(

@@ -150,6 +150,7 @@ the frontend as a typed client (`frontend/src/services/api.d.ts`).
 |--------|------|-------|
 | POST | `/chat` | Non-streaming answer + citations. `question` is 1 to 2,000 characters after trimming, else 422 (SEC-002) |
 | POST | `/chat/stream` | SSE token stream (API-004) |
+| GET | `/chat/questions` | The caller's past questions (§26.2 saved questions), newest first, as `{message_id, ticker, question, asked_at}`. Requires auth; cursor-paged via `X-Next-Cursor`. Messages past the retention window (SEC-014) are purged, so they drop off this list |
 | GET | `/chat/sessions/{id}` | Session history |
 | POST | `/chat/messages/{id}/feedback` | Thumbs up/down |
 

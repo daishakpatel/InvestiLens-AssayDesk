@@ -24,6 +24,8 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.main import app
 from app.models import (
+    ChatMessage,
+    ChatSession,
     ClaimVerification,
     Company,
     DataFreshness,
@@ -525,6 +527,34 @@ def test_research_history_lists_own_completed_reports(
     cursor = first.headers["X-Next-Cursor"]
     second = client.get(f"{_P}/research?limit=1&cursor={cursor}", headers=h)
     assert [r["research_id"] for r in second.json()] == [str(rows[0].id)]
+    assert "X-Next-Cursor" not in second.headers
+
+
+def test_saved_questions_list_own_questions(
+    client: TestClient, session: Session, seed: dict[str, int]
+) -> None:
+    """§26.2: a reader sees the questions they asked, newest first, never answers or others'."""
+    mine = ChatSession(user_id=seed["user"], company_id=seed["company"])
+    theirs = ChatSession(user_id=seed["admin"], company_id=seed["company"])
+    session.add_all([mine, theirs])
+    session.flush()
+    for sid, role, text in [
+        (mine.id, "user", "What drove revenue?"),
+        (mine.id, "assistant", "Data center demand."),
+        (theirs.id, "user", "Someone else's question"),
+        (mine.id, "user", "What are the main risks?"),
+    ]:
+        session.add(ChatMessage(session_id=sid, role=role, content=text))
+        session.flush()
+    h = auth_headers(seed["user"])
+    assert client.get(f"{_P}/chat/questions").status_code == 401
+
+    first = client.get(f"{_P}/chat/questions?limit=1", headers=h)
+    assert [q["question"] for q in first.json()] == ["What are the main risks?"]
+    assert first.json()[0]["ticker"] == "TST"
+    cursor = first.headers["X-Next-Cursor"]
+    second = client.get(f"{_P}/chat/questions?limit=1&cursor={cursor}", headers=h)
+    assert [q["question"] for q in second.json()] == ["What drove revenue?"]
     assert "X-Next-Cursor" not in second.headers
 
 

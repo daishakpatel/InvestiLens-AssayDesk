@@ -200,6 +200,35 @@
         "title": "AlertUpdate",
         "type": "object"
       },
+      "AskedQuestion": {
+        "description": "One question the reader asked (\u00a726.2 saved questions), to ask again from the list.",
+        "properties": {
+          "asked_at": {
+            "title": "Asked At",
+            "type": "string"
+          },
+          "message_id": {
+            "title": "Message Id",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id",
+          "ticker",
+          "question",
+          "asked_at"
+        ],
+        "title": "AskedQuestion",
+        "type": "object"
+      },
       "AuthMessage": {
         "description": "A neutral acknowledgement (used where revealing specifics would enable enumeration).",
         "properties": {
@@ -11007,6 +11036,92 @@
           }
         },
         "summary": "Message Feedback",
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/api/v1/chat/questions": {
+      "get": {
+        "description": "The caller's past questions, newest first (\u00a726.2); kept only as long as SEC-014 allows.",
+        "operationId": "list_my_questions_api_v1_chat_questions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AskedQuestion"
+                  },
+                  "title": "Response List My Questions Api V1 Chat Questions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List My Questions",
         "tags": [
           "Chat"
         ]

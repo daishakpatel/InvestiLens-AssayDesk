@@ -118,7 +118,9 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [x] **Saved reports / research history**: `GET /research` lists the caller's completed reports;
       "Your research" page (account menu) links each to `/report/:id`, 2026-11-14. The page loads
       only the first 200. `[code]`
-- [ ] **Saved questions**: chat turns are stored per user but there is no list of past questions. `[code]`
+- [x] **Saved questions**: `GET /chat/questions` lists the caller's past questions; the "Your
+      research" page shows them (same question per company once) and each link asks it again via
+      `/company/:ticker/chat?ask=`, 2026-11-14. Past answers are not shown, only re-asked. `[code]`
 - [ ] **Watchlist items**: no add/remove-item endpoint; each watched company is its own
       watchlist (ADR-0031 stand-in). Needs `POST/DELETE /watchlists/{id}/items` + a data migration. `[code]`
 - [x] Alerts: `POST /alerts` takes no `config` (price-move threshold, news category);

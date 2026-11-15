@@ -47,6 +47,7 @@ import type {
   ResearchAccepted,
   ResearchReportEnvelope,
   ResearchSummary,
+  AskedQuestion,
   SourceDetail,
   ValuationResponse,
   VerifiedOutput,
@@ -446,6 +447,20 @@ export function useMyResearch(userId: string | null): UseQueryResult<ResearchSum
       // shortcut: first page only (the API's 200 cap); add cursor paging if a reader passes that.
       const { data } = await apiRequest<unknown>("/research?limit=200", { signal });
       return parse.researchHistory(data);
+    },
+  });
+}
+
+/** The signed-in reader's past questions, newest first (§26.2). */
+export function useMyQuestions(userId: string | null): UseQueryResult<AskedQuestion[]> {
+  return useQuery({
+    queryKey: ["chat-questions", userId],
+    enabled: userId !== null,
+    staleTime: MINUTE,
+    queryFn: async ({ signal }) => {
+      // shortcut: first page only (the API's 200 cap); add cursor paging if a reader passes that.
+      const { data } = await apiRequest<unknown>("/chat/questions?limit=200", { signal });
+      return parse.askedQuestions(data);
     },
   });
 }

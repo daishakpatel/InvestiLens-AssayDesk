@@ -7,16 +7,18 @@ map it to the response / SSE stream. Chat requires an account; the user is taken
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id
+from app.api.pagination import NEXT_CURSOR_HEADER, clamp_limit, decode_cursor, encode_cursor
 from app.chat.service import ChatTurn, answer_question
 from app.chat.streaming import sse_events
 from app.db import get_db
 from app.repositories import chat as chat_repo
 from app.schemas.chat import (
+    AskedQuestion,
     ChatMessage,
     ChatRequest,
     ChatResponse,
@@ -84,6 +86,33 @@ def chat_stream(body: ChatRequest, db: Session = _DB, user_id: int = _USER) -> S
     )
     db.commit()
     return StreamingResponse(sse_events(turn), media_type="text/event-stream")
+
+
+@router.get("/questions", response_model=list[AskedQuestion])
+def list_my_questions(
+    response: Response,
+    limit: int | None = None,
+    cursor: str | None = None,
+    db: Session = _DB,
+    user_id: int = _USER,
+) -> list[AskedQuestion]:
+    """The caller's past questions, newest first (§26.2); kept only as long as SEC-014 allows."""
+    page_size = clamp_limit(limit)
+    rows = chat_repo.questions_for_user(
+        db, user_id=user_id, limit=page_size + 1, before_id=decode_cursor(cursor)
+    )
+    if len(rows) > page_size:
+        rows = rows[:page_size]
+        response.headers[NEXT_CURSOR_HEADER] = encode_cursor(rows[-1][0].id)
+    return [
+        AskedQuestion(
+            message_id=str(message.id),
+            ticker=ticker,
+            question=message.content,
+            asked_at=message.created_at.isoformat(),
+        )
+        for message, ticker in rows
+    ]
 
 
 @router.get("/sessions/{session_id}", response_model=ChatSession)

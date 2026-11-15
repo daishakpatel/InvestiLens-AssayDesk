@@ -46,6 +46,7 @@ import type {
   ResearchAccepted,
   ResearchReportEnvelope,
   ResearchSummary,
+  AskedQuestion,
   SourceDetail,
   ThesisDetail,
   ThesisEvent,
@@ -505,6 +506,13 @@ const researchSummary = z.object({
   ticker: z.string(),
   generated_at: z.string().nullish(),
   model: z.string().nullish(),
+});
+
+const askedQuestion = z.object({
+  message_id: z.string(),
+  ticker: z.string(),
+  question: z.string(),
+  asked_at: z.string(),
 });
 
 const researchEnvelope = z.object({
@@ -1260,6 +1268,7 @@ export const parse = {
   token: (d: unknown): TokenResponse => token.parse(d) as TokenResponse,
   profile: (d: unknown): UserProfile => profile.parse(d) as UserProfile,
   demoInfo: (d: unknown): DemoInfo => demoInfo.parse(d) as DemoInfo,
+  askedQuestions: (d: unknown): AskedQuestion[] => z.array(askedQuestion).parse(d) as AskedQuestion[],
   researchHistory: (d: unknown): ResearchSummary[] =>
     z.array(researchSummary).parse(d) as ResearchSummary[],
   researchEnvelope: (d: unknown): ResearchReportEnvelope =>
