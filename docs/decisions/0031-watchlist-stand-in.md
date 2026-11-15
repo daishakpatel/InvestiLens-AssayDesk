@@ -1,6 +1,6 @@
 # ADR-0031: Watching a company is stored as a one-company watchlist, until the API can add items
 
-- **Status:** Accepted (temporary)
+- **Status:** Superseded by ADR-0062
 - **Date:** 2026-10-11
 - **Spec refs:** §26.2, FR-007; UI plan Step 5
 

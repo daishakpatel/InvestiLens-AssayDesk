@@ -683,22 +683,31 @@ export function useWatchlists(userId: string | null): UseQueryResult<Watchlist[]
   });
 }
 
-export function useCreateWatchlist(): UseMutationResult<Watchlist, Error, string> {
+/** Watch puts the company on the reader's first list, making one if they have none; unwatch takes
+ *  it off every list it is on (ADR-0062). */
+export function useSetWatched(): UseMutationResult<
+  void,
+  Error,
+  { lists: readonly Watchlist[]; ticker: string; watch: boolean }
+> {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (name: string) => {
-      const { data } = await apiRequest<unknown>("/watchlists", { method: "POST", body: { name } });
-      return parse.watchlist(data);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["watchlists"] }),
-  });
-}
-
-export function useDeleteWatchlist(): UseMutationResult<void, Error, string> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest<unknown>(`/watchlists/${id}`, { method: "DELETE" });
+    mutationFn: async ({ lists, ticker, watch }) => {
+      if (watch) {
+        let id = lists[0]?.id;
+        if (id === undefined) {
+          const { data } = await apiRequest<unknown>("/watchlists", { method: "POST", body: { name: "Watchlist" } });
+          id = parse.watchlist(data).id;
+        }
+        await apiRequest<unknown>(`/watchlists/${id}/items`, { method: "POST", body: { ticker } });
+        return;
+      }
+      const holding = lists.filter((list) => list.items.some((item) => item.ticker.toUpperCase() === ticker));
+      await Promise.all(
+        holding.map((list) =>
+          apiRequest<unknown>(`/watchlists/${list.id}/items/${encodeURIComponent(ticker)}`, { method: "DELETE" }),
+        ),
+      );
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["watchlists"] }),
   });

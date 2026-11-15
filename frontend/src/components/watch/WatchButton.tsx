@@ -1,8 +1,8 @@
 import { Star } from "lucide-react";
 
 import { useAuth } from "../../lib/auth";
-import { useCreateWatchlist, useDeleteWatchlist, useWatchlists } from "../../lib/queries";
-import { watchEntry, watchedTickers } from "../../lib/watchlist";
+import { useSetWatched, useWatchlists } from "../../lib/queries";
+import { watchedTickers } from "../../lib/watchlist";
 import { SignInHint } from "../SignInHint";
 import { Popover } from "../ui/Popover";
 
@@ -15,8 +15,7 @@ const ACTION =
 export function WatchButton({ ticker }: { ticker: string }) {
   const { user } = useAuth();
   const lists = useWatchlists(user?.id ?? null);
-  const add = useCreateWatchlist();
-  const remove = useDeleteWatchlist();
+  const setWatched = useSetWatched();
   const symbol = ticker.toUpperCase();
 
   if (!user) {
@@ -35,19 +34,17 @@ export function WatchButton({ ticker }: { ticker: string }) {
     );
   }
 
-  const entry = watchEntry(lists.data ?? [], symbol);
   const watched = watchedTickers(lists.data ?? []).includes(symbol);
-  const busy = lists.isPending || add.isPending || remove.isPending;
-  const failed = lists.isError || add.isError || remove.isError;
+  const busy = lists.isPending || setWatched.isPending;
+  const failed = lists.isError || setWatched.isError;
 
   return (
     <span className="relative">
       <button
         type="button"
         aria-pressed={watched}
-        // Watched through a list this button did not create: it cannot be undone from here.
-        disabled={busy || (watched && !entry)}
-        onClick={() => (entry ? remove.mutate(entry.id) : add.mutate(symbol))}
+        disabled={busy}
+        onClick={() => setWatched.mutate({ lists: lists.data ?? [], ticker: symbol, watch: !watched })}
         className={`${ACTION} ${watched ? "bg-surface-2" : ""}`}
       >
         <Star aria-hidden className="size-4" fill={watched ? "currentColor" : "none"} />

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Watchlist } from "../types";
-import { watchEntry, watchedTickers } from "./watchlist";
+import { watchedTickers } from "./watchlist";
 
 const list = (id: string, name: string, items: string[] = []): Watchlist => ({
   id,
@@ -9,23 +9,14 @@ const list = (id: string, name: string, items: string[] = []): Watchlist => ({
   items: items.map((ticker) => ({ ticker })),
 });
 
-// FR-007 (watchlist): the stand-in for a missing "add to watchlist" API operation.
+// FR-007 (watchlist), ADR-0062.
 describe("watchedTickers", () => {
-  it("reads one-company lists named by ticker, oldest first, without repeats", () => {
-    const lists = [list("1", "NVDA"), list("2", "BRK.B"), list("3", "NVDA")];
-    expect(watchedTickers(lists)).toEqual(["NVDA", "BRK.B"]);
+  it("reads every list's items, in order, upper-cased, without repeats", () => {
+    const lists = [list("1", "Watchlist", ["nvda", "AMD"]), list("2", "Chips", ["AMD", "INTC"])];
+    expect(watchedTickers(lists)).toEqual(["NVDA", "AMD", "INTC"]);
   });
 
-  it("ignores a list whose name is not a ticker, and reads real items when a list has them", () => {
-    const lists = [list("1", "My favourites"), list("2", "Chips", ["amd", "INTC"]), list("3", "nvda")];
-    expect(watchedTickers(lists)).toEqual(["AMD", "INTC"]);
-  });
-});
-
-describe("watchEntry", () => {
-  it("finds the list to delete, case-insensitively, and never a list with real items", () => {
-    const lists = [list("1", "Chips", ["NVDA"]), list("2", "NVDA")];
-    expect(watchEntry(lists, "nvda")?.id).toBe("2");
-    expect(watchEntry(lists, "AMD")).toBeUndefined();
+  it("ignores a list's name: an empty list named like a ticker watches nothing", () => {
+    expect(watchedTickers([list("1", "NVDA")])).toEqual([]);
   });
 });

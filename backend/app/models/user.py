@@ -91,9 +91,10 @@ class Watchlist(Base):
 
 
 class WatchlistItem(Base):
-    """A company on a watchlist."""
+    """A company on a watchlist, at most once per list (ADR-0062)."""
 
     __tablename__ = "watchlist_items"
+    __table_args__ = (UniqueConstraint("watchlist_id", "company_id"),)
 
     id: Mapped[intpk]
     watchlist_id: Mapped[int] = mapped_column(

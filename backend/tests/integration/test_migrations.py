@@ -188,3 +188,61 @@ def test_metric_gaps_migration_up_and_down(alembic_cfg: Config, test_engine: Eng
     assert "metric_gaps" not in public_table_names(test_engine)
     assert "financial_metrics" in public_table_names(test_engine)
     command.upgrade(alembic_cfg, "head")
+
+
+def test_watchlist_standins_merge_into_one_list(alembic_cfg: Config, test_engine: Engine) -> None:
+    """ADR-0062: each user's one-company lists named by ticker (the ADR-0031 stand-in) become
+    items on one list, oldest first; lists with items or a non-ticker name are untouched."""
+    command.downgrade(alembic_cfg, "base")
+    command.upgrade(alembic_cfg, "69ec64a10d9e")
+    with test_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO users (email, password_hash, role, is_active) VALUES"
+                " ('a@example.com', 'x', 'user', true), ('b@example.com', 'x', 'user', true);"
+                "INSERT INTO companies (ticker, cik, name, status) VALUES"
+                " ('NVDA', '0000000001', 'Nvidia', 'active'),"
+                " ('AMD', '0000000002', 'AMD', 'active');"
+                "INSERT INTO watchlists (user_id, name) SELECT id, 'NVDA' FROM users"
+                " WHERE email = 'a@example.com';"
+                "INSERT INTO watchlists (user_id, name) SELECT id, 'Chips' FROM users"
+                " WHERE email = 'a@example.com';"
+                "INSERT INTO watchlists (user_id, name) SELECT id, 'AMD' FROM users"
+                " WHERE email = 'a@example.com';"
+                "INSERT INTO watchlists (user_id, name) SELECT id, 'Favourites' FROM users"
+                " WHERE email = 'b@example.com';"
+                "INSERT INTO watchlists (user_id, name) SELECT id, 'AMD' FROM users"
+                " WHERE email = 'b@example.com';"
+                "INSERT INTO watchlist_items (watchlist_id, company_id)"
+                " SELECT w.id, c.id FROM watchlists w, companies c"
+                " WHERE w.name = 'Chips' AND c.ticker = 'NVDA';"
+            )
+        )
+
+    command.upgrade(alembic_cfg, "c3e8a1f5d7b2")
+    query = text(
+        "SELECT u.email, w.name, coalesce(string_agg(c.ticker, ',' ORDER BY i.id), '')"
+        " FROM watchlists w JOIN users u ON u.id = w.user_id"
+        " LEFT JOIN watchlist_items i ON i.watchlist_id = w.id"
+        " LEFT JOIN companies c ON c.id = i.company_id"
+        " GROUP BY u.email, w.id, w.name ORDER BY w.id"
+    )
+    with test_engine.connect() as conn:
+        rows = [tuple(r) for r in conn.execute(query)]
+    assert rows == [
+        ("a@example.com", "Watchlist", "NVDA,AMD"),
+        ("a@example.com", "Chips", "NVDA"),
+        ("b@example.com", "Favourites", ""),
+        ("b@example.com", "Watchlist", "AMD"),
+    ]
+    with pytest.raises(IntegrityError), test_engine.begin() as conn:  # now one row per company
+        conn.execute(
+            text(
+                "INSERT INTO watchlist_items (watchlist_id, company_id)"
+                " SELECT watchlist_id, company_id FROM watchlist_items LIMIT 1"
+            )
+        )
+
+    command.downgrade(alembic_cfg, "69ec64a10d9e")  # reverses cleanly
+    command.downgrade(alembic_cfg, "base")  # leave no rows behind for later tests
+    command.upgrade(alembic_cfg, "head")

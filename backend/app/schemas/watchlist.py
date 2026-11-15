@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 Channel = Literal["email", "in_app"]
 Severity = Literal["info", "warning", "critical"]
@@ -21,7 +21,12 @@ class Watchlist(BaseModel):
 
 
 class WatchlistCreate(BaseModel):
-    name: str
+    # Trimmed, 1-128 characters: the column is VARCHAR(128), so a longer name was a 500.
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
+
+
+class WatchlistItemCreate(BaseModel):
+    ticker: str = Field(min_length=1, max_length=16)
 
 
 class AlertEventType(BaseModel):

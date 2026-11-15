@@ -150,7 +150,7 @@ the frontend as a typed client (`frontend/src/services/api.d.ts`).
 |--------|------|-------|
 | POST | `/chat` | Non-streaming answer + citations. `question` is 1 to 2,000 characters after trimming, else 422 (SEC-002) |
 | POST | `/chat/stream` | SSE token stream (API-004) |
-| GET | `/chat/questions` | The caller's past questions (§26.2 saved questions), newest first, as `{message_id, ticker, question, asked_at}`. Requires auth; cursor-paged via `X-Next-Cursor`. Messages past the retention window (SEC-014) are purged, so they drop off this list |
+| GET | `/chat/questions` | The caller's past questions (§26.2 saved questions), newest first, as `{message_id, ticker, question, asked_at}`. Requires auth; cursor-paged via `X-Next-Cursor`. Messages past the retention window (SEC-014) are purged, so they drop off this list. Always `[]` in demo mode, where every visitor shares one account (ADR-0050) |
 | GET | `/chat/sessions/{id}` | Session history |
 | POST | `/chat/messages/{id}/feedback` | Thumbs up/down |
 
@@ -183,7 +183,9 @@ but **may not** generate reports, use chat, or touch user-owned data (anonymous 
 ### Watchlist, alerts & feedback
 | Method | Path |
 |--------|------|
-| GET / POST | `/watchlists`, `/watchlists/{id}` (DELETE) |
+| GET / POST | `/watchlists`, `/watchlists/{id}` (DELETE). POST `{name}`: trimmed, 1–128 characters, else 422 |
+| POST | `/watchlists/{id}/items` — body `{ticker}`; adds the company to the caller's list and returns the list (201). Already on it changes nothing; another user's list or an unknown ticker is 404 (ADR-0062) |
+| DELETE | `/watchlists/{id}/items/{ticker}` — 204; not on the list is also 204; another user's list is 404 |
 | GET | `/alerts/event-types` |
 | GET / POST | `/alerts` |
 | PATCH / DELETE | `/alerts/{id}` |

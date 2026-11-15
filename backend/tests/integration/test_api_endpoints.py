@@ -632,6 +632,29 @@ def test_alert_and_watchlist_lists_are_user_scoped(
     assert client.get(f"{_P}/watchlists", headers=bob_headers).json() == []
 
 
+def test_watchlist_items_add_and_remove(client: TestClient, seed: dict[str, int]) -> None:
+    """FR-007 / ADR-0062: add and remove companies on your own list; repeats change nothing."""
+    h, other = auth_headers(seed["user"]), auth_headers(seed["admin"])
+    for bad in ("   ", "x" * 129):  # blank or longer than the column: 422, never a 500
+        assert client.post(f"{_P}/watchlists", json={"name": bad}, headers=h).status_code == 422
+    created = client.post(f"{_P}/watchlists", json={"name": "  Watchlist "}, headers=h).json()
+    assert created["name"] == "Watchlist"
+    wid = created["id"]
+    items = f"{_P}/watchlists/{wid}/items"
+
+    added = client.post(items, json={"ticker": "tst"}, headers=h)
+    assert added.status_code == 201 and added.json()["items"] == [{"ticker": "TST"}]
+    again = client.post(items, json={"ticker": "TST"}, headers=h)
+    assert again.json()["items"] == [{"ticker": "TST"}]  # no duplicate
+    assert client.post(items, json={"ticker": "ZZZZ"}, headers=h).status_code == 404
+    assert client.post(items, json={"ticker": "TST"}, headers=other).status_code == 404
+    assert client.delete(f"{items}/TST", headers=other).status_code == 404
+
+    assert client.delete(f"{items}/TST", headers=h).status_code == 204
+    assert client.delete(f"{items}/TST", headers=h).status_code == 204  # already gone
+    assert client.get(f"{_P}/watchlists", headers=h).json()[0]["items"] == []
+
+
 def test_admin_role_gated(client: TestClient, seed: dict[str, int]) -> None:
     user_h = auth_headers(seed["user"])
     admin_h = auth_headers(seed["admin"])

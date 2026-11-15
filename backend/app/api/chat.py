@@ -15,6 +15,7 @@ from app.api.deps import get_current_user_id
 from app.api.pagination import NEXT_CURSOR_HEADER, clamp_limit, decode_cursor, encode_cursor
 from app.chat.service import ChatTurn, answer_question
 from app.chat.streaming import sse_events
+from app.config import get_settings
 from app.db import get_db
 from app.repositories import chat as chat_repo
 from app.schemas.chat import (
@@ -97,6 +98,8 @@ def list_my_questions(
     user_id: int = _USER,
 ) -> list[AskedQuestion]:
     """The caller's past questions, newest first (§26.2); kept only as long as SEC-014 allows."""
+    if get_settings().demo_mode:
+        return []  # the demo's one shared account would show visitors each other's questions
     page_size = clamp_limit(limit)
     rows = chat_repo.questions_for_user(
         db, user_id=user_id, limit=page_size + 1, before_id=decode_cursor(cursor)

@@ -1535,6 +1535,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/watchlists/{watchlist_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Watchlist Item
+         * @description Add a company to one of the caller's lists; adding it twice changes nothing (ADR-0062).
+         */
+        post: operations["add_watchlist_item_api_v1_watchlists__watchlist_id__items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/watchlists/{watchlist_id}/items/{ticker}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Watchlist Item
+         * @description Remove a company from one of the caller's lists; not on it is already done (ADR-0062).
+         */
+        delete: operations["remove_watchlist_item_api_v1_watchlists__watchlist_id__items__ticker__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4825,6 +4865,11 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** WatchlistItemCreate */
+        WatchlistItemCreate: {
+            /** Ticker */
+            ticker: string;
+        };
         /**
          * WeightedMetric
          * @description A portfolio-weighted metric. `coverage` is the fraction of weight that had a value (weights
@@ -7971,6 +8016,75 @@ export interface operations {
             };
             path: {
                 watchlist_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_watchlist_item_api_v1_watchlists__watchlist_id__items_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                watchlist_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Watchlist"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_watchlist_item_api_v1_watchlists__watchlist_id__items__ticker__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                watchlist_id: number;
+                ticker: string;
             };
             cookie?: never;
         };

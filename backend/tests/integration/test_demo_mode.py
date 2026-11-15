@@ -16,7 +16,7 @@ from app.auth.demo import DEMO_EMAIL, reset_demo_sandbox
 from app.config import get_settings
 from app.db import get_db
 from app.main import app
-from app.models import Company, Document, Filing, User, Watchlist
+from app.models import ChatMessage, ChatSession, Company, Document, Filing, User, Watchlist
 
 _P = "/api/v1"
 
@@ -130,3 +130,23 @@ def test_demo_banner_reports_the_fixture_date(
     session.flush()
     body = client.get(f"{_P}/meta/demo").json()
     assert body["enabled"] is True and body["data_as_of"] >= "2026-05-28"
+
+
+def test_demo_hides_saved_questions(
+    client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-0050: every visitor shares one account, so one visitor's questions stay unseen."""
+    _demo(monkeypatch, True)
+    token = client.post(f"{_P}/auth/demo").json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    user_id = int(client.get(f"{_P}/auth/me", headers=headers).json()["id"])
+    company = Company(ticker="DMQ", cik="0000000098", name="Demo Q Corp")
+    session.add(company)
+    session.flush()
+    chat = ChatSession(user_id=user_id, company_id=company.id)
+    session.add(chat)
+    session.flush()
+    session.add(ChatMessage(session_id=chat.id, role="user", content="my private question"))
+    session.flush()
+
+    assert client.get(f"{_P}/chat/questions", headers=headers).json() == []

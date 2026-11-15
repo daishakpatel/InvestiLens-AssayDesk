@@ -24,6 +24,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.models import Alert as AlertRow
 from app.models import Company
+from app.models import Watchlist as WatchlistRow
 from app.repositories import alerts as alert_repo
 from app.repositories import companies as company_repo
 from app.repositories import notifications as notif_repo
@@ -40,6 +41,7 @@ from app.schemas.watchlist import (
     Watchlist,
     WatchlistCreate,
     WatchlistItem,
+    WatchlistItemCreate,
 )
 
 router = APIRouter(tags=["Watchlist & Alerts"])
@@ -48,19 +50,23 @@ _DB = Depends(get_db, scope="function")
 _USER = Depends(get_current_user_id)
 
 
+def _watchlist_out(db: Session, row: WatchlistRow) -> Watchlist:
+    tickers = watchlist_repo.item_tickers(db, watchlist_id=row.id)
+    return Watchlist(
+        id=str(row.id), name=row.name, items=[WatchlistItem(ticker=t) for t in tickers]
+    )
+
+
+def _owned(db: Session, user_id: int, watchlist_id: int) -> WatchlistRow:
+    row = watchlist_repo.get_for_user(db, user_id=user_id, watchlist_id=watchlist_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "watchlist not found")
+    return row
+
+
 @router.get("/watchlists", response_model=list[Watchlist])
 def list_watchlists(db: Session = _DB, user_id: int = _USER) -> list[Watchlist]:
-    rows = watchlist_repo.list_for_user(db, user_id=user_id)
-    return [
-        Watchlist(
-            id=str(w.id),
-            name=w.name,
-            items=[
-                WatchlistItem(ticker=t) for t in watchlist_repo.item_tickers(db, watchlist_id=w.id)
-            ],
-        )
-        for w in rows
-    ]
+    return [_watchlist_out(db, w) for w in watchlist_repo.list_for_user(db, user_id=user_id)]
 
 
 @router.post("/watchlists", status_code=201, response_model=Watchlist)
@@ -75,6 +81,34 @@ def delete_watchlist(watchlist_id: int, db: Session = _DB, user_id: int = _USER)
     if not watchlist_repo.delete_for_user(db, user_id=user_id, watchlist_id=watchlist_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "watchlist not found")
     db.commit()
+
+
+@router.post("/watchlists/{watchlist_id}/items", status_code=201, response_model=Watchlist)
+def add_watchlist_item(
+    watchlist_id: int, body: WatchlistItemCreate, db: Session = _DB, user_id: int = _USER
+) -> Watchlist:
+    """Add a company to one of the caller's lists; adding it twice changes nothing (ADR-0062)."""
+    row = _owned(db, user_id, watchlist_id)
+    company = company_repo.get_by_ticker(db, body.ticker)
+    if company is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"company {body.ticker.upper()} not ingested"
+        )
+    watchlist_repo.add_item(db, watchlist_id=row.id, company_id=company.id)
+    db.commit()
+    return _watchlist_out(db, row)
+
+
+@router.delete("/watchlists/{watchlist_id}/items/{ticker}", status_code=204)
+def remove_watchlist_item(
+    watchlist_id: int, ticker: str, db: Session = _DB, user_id: int = _USER
+) -> None:
+    """Remove a company from one of the caller's lists; not on it is already done (ADR-0062)."""
+    row = _owned(db, user_id, watchlist_id)
+    company = company_repo.get_by_ticker(db, ticker)
+    if company is not None:
+        watchlist_repo.remove_item(db, watchlist_id=row.id, company_id=company.id)
+        db.commit()
 
 
 def _alert_out(row: AlertRow, ticker: str | None) -> Alert:

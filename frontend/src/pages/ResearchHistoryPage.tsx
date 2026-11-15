@@ -6,7 +6,7 @@ import { Section } from "../components/ui/Section";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
 import { useAuth } from "../lib/auth";
 import { formatDate } from "../lib/format";
-import { useMyQuestions, useMyResearch } from "../lib/queries";
+import { useDemoInfo, useMyQuestions, useMyResearch } from "../lib/queries";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import type { AskedQuestion } from "../types";
 
@@ -51,6 +51,11 @@ function distinct(questions: AskedQuestion[]): AskedQuestion[] {
 
 function Questions({ userId }: { userId: string }) {
   const asked = useMyQuestions(userId);
+  const demo = useDemoInfo().data?.enabled === true;
+
+  if (demo) {
+    return <EmptyState message="Past questions aren’t kept in the demo: every visitor shares one account." />;
+  }
 
   if (asked.isError) {
     return <ErrorState message="Your questions could not be loaded." onRetry={() => void asked.refetch()} />;

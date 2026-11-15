@@ -121,8 +121,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [x] **Saved questions**: `GET /chat/questions` lists the caller's past questions; the "Your
       research" page shows them (same question per company once) and each link asks it again via
       `/company/:ticker/chat?ask=`, 2026-11-14. Past answers are not shown, only re-asked. `[code]`
-- [ ] **Watchlist items**: no add/remove-item endpoint; each watched company is its own
-      watchlist (ADR-0031 stand-in). Needs `POST/DELETE /watchlists/{id}/items` + a data migration. `[code]`
+- [x] **Watchlist items**: `POST/DELETE /watchlists/{id}/items`, unique per list, and migration
+      `c3e8a1f5d7b2` merging the ADR-0031 stand-ins; Watch/Unwatch use items, 2026-11-15 (ADR-0062).
+      This also makes watchlist-wide alerts, the red-flag watchlist feed and brief eligibility see
+      watched companies (they read items). No UI for several lists or renaming. `[code]`
 - [x] Alerts: `POST /alerts` takes no `config` (price-move threshold, news category);
       `Notification` has no ticker. Done in Phase 7a (ADR-0039): typed `params`, `ticker` on
       notifications, `/alerts` settings page. `[code]` / `[notes]`

@@ -9625,6 +9625,8 @@
       "WatchlistCreate": {
         "properties": {
           "name": {
+            "maxLength": 128,
+            "minLength": 1,
             "title": "Name",
             "type": "string"
           }
@@ -9646,6 +9648,21 @@
           "ticker"
         ],
         "title": "WatchlistItem",
+        "type": "object"
+      },
+      "WatchlistItemCreate": {
+        "properties": {
+          "ticker": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker"
+        ],
+        "title": "WatchlistItemCreate",
         "type": "object"
       },
       "WeightedMetric": {
@@ -15493,6 +15510,136 @@
           }
         },
         "summary": "Delete Watchlist",
+        "tags": [
+          "Watchlist & Alerts"
+        ]
+      }
+    },
+    "/api/v1/watchlists/{watchlist_id}/items": {
+      "post": {
+        "description": "Add a company to one of the caller's lists; adding it twice changes nothing (ADR-0062).",
+        "operationId": "add_watchlist_item_api_v1_watchlists__watchlist_id__items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "watchlist_id",
+            "required": true,
+            "schema": {
+              "title": "Watchlist Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistItemCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Watchlist"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Watchlist Item",
+        "tags": [
+          "Watchlist & Alerts"
+        ]
+      }
+    },
+    "/api/v1/watchlists/{watchlist_id}/items/{ticker}": {
+      "delete": {
+        "description": "Remove a company from one of the caller's lists; not on it is already done (ADR-0062).",
+        "operationId": "remove_watchlist_item_api_v1_watchlists__watchlist_id__items__ticker__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "watchlist_id",
+            "required": true,
+            "schema": {
+              "title": "Watchlist Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Watchlist Item",
         "tags": [
           "Watchlist & Alerts"
         ]
