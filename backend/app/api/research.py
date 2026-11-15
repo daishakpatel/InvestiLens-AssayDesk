@@ -10,12 +10,13 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id
+from app.api.pagination import NEXT_CURSOR_HEADER, clamp_limit, decode_cursor, encode_cursor
 from app.billing.budget import check_budget
 from app.config import get_settings
 from app.db import get_db
@@ -33,6 +34,7 @@ from app.schemas.jobs import (
     ResearchAccepted,
     ResearchReportEnvelope,
     ResearchRequest,
+    ResearchSummary,
 )
 from app.schemas.research import ReportDiff, ResearchReport
 from app.utils.logging import get_logger, log_event
@@ -136,6 +138,33 @@ def create_research(
 
         generate_research_report.delay(company.ticker, job.id, user_id)
     return _accepted(job)
+
+
+@router.get("", response_model=list[ResearchSummary])
+def list_my_research(
+    response: Response,
+    limit: int | None = None,
+    cursor: str | None = None,
+    db: Session = _DB,
+    user_id: int = _USER,
+) -> list[ResearchSummary]:
+    """The caller's research history: completed reports they generated, newest first (§26.2)."""
+    page_size = clamp_limit(limit)
+    rows = report_repo.list_for_user(
+        db, user_id=user_id, limit=page_size + 1, before_id=decode_cursor(cursor)
+    )
+    if len(rows) > page_size:
+        rows = rows[:page_size]
+        response.headers[NEXT_CURSOR_HEADER] = encode_cursor(rows[-1][0].id)
+    return [
+        ResearchSummary(
+            research_id=str(report.id),
+            ticker=ticker,
+            generated_at=report.generated_at.isoformat() if report.generated_at else None,
+            model=report.model,
+        )
+        for report, ticker in rows
+    ]
 
 
 @router.get("/jobs/{job_id}", response_model=JobState)

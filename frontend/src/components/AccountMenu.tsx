@@ -62,6 +62,7 @@ export default function AccountMenu() {
         {user ? (
           <>
             <MenuLabel>{user.email}</MenuLabel>
+            <MenuItem onSelect={() => navigate("/research")}>Your research</MenuItem>
             <MenuItem onSelect={() => navigate("/alerts")}>Alerts</MenuItem>
           </>
         ) : (

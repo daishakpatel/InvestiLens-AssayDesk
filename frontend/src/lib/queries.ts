@@ -46,6 +46,7 @@ import type {
   ReportDiff,
   ResearchAccepted,
   ResearchReportEnvelope,
+  ResearchSummary,
   SourceDetail,
   ValuationResponse,
   VerifiedOutput,
@@ -430,6 +431,33 @@ export function useLatestResearch(ticker: string): UseQueryResult<ResearchReport
     staleTime: MINUTE,
     queryFn: async ({ signal }) => {
       const { data } = await apiRequest<unknown>(`/companies/${ticker}/research/latest`, { signal });
+      return parse.researchEnvelope(data);
+    },
+  });
+}
+
+/** The signed-in reader's completed reports, newest first (§26.2). */
+export function useMyResearch(userId: string | null): UseQueryResult<ResearchSummary[]> {
+  return useQuery({
+    queryKey: ["research-history", userId],
+    enabled: userId !== null,
+    staleTime: MINUTE,
+    queryFn: async ({ signal }) => {
+      // shortcut: first page only (the API's 200 cap); add cursor paging if a reader passes that.
+      const { data } = await apiRequest<unknown>("/research?limit=200", { signal });
+      return parse.researchHistory(data);
+    },
+  });
+}
+
+/** One stored report by id, for its own shareable page; a 404 means there is no such report. */
+export function useResearch(researchId: string): UseQueryResult<ResearchReportEnvelope> {
+  return useQuery({
+    queryKey: ["research", researchId],
+    retry: false,
+    staleTime: 10 * MINUTE, // a stored report never changes
+    queryFn: async ({ signal }) => {
+      const { data } = await apiRequest<unknown>(`/research/${researchId}`, { signal });
       return parse.researchEnvelope(data);
     },
   });

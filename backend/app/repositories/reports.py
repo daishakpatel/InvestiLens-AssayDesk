@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import ReportFeedback, ResearchReport, ResearchSource
+from app.models import Company, ReportFeedback, ResearchReport, ResearchSource
 from app.schemas.citations import Citation
 
 
@@ -31,6 +31,23 @@ def get_latest_complete(session: Session, *, company_id: int) -> ResearchReport 
         )
         .order_by(ResearchReport.generated_at.desc(), ResearchReport.id.desc())
     )
+
+
+def list_for_user(
+    session: Session, *, user_id: int, limit: int, before_id: int | None
+) -> list[tuple[ResearchReport, str]]:
+    """A reader's completed reports with their tickers, newest first, keyset by id (§26.2)."""
+    conditions = [ResearchReport.user_id == user_id, ResearchReport.status == "complete"]
+    if before_id is not None:
+        conditions.append(ResearchReport.id < before_id)
+    rows = session.execute(
+        select(ResearchReport, Company.ticker)
+        .join(Company, Company.id == ResearchReport.company_id)
+        .where(*conditions)
+        .order_by(ResearchReport.id.desc())
+        .limit(limit)
+    )
+    return [(report, ticker) for report, ticker in rows.tuples()]
 
 
 def get_previous_complete(session: Session, report: ResearchReport) -> ResearchReport | None:

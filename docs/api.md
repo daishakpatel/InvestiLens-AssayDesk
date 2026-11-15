@@ -118,9 +118,10 @@ the frontend as a typed client (`frontend/src/services/api.d.ts`).
 | Method | Path | Notes |
 |--------|------|-------|
 | POST | `/research` | 202 + `job_id`; `Idempotency-Key` (API-003) |
+| GET | `/research` | The caller's research history (§26.2): their completed reports, newest first, as `{research_id, ticker, generated_at, model}`. Requires auth; cursor-paged via `X-Next-Cursor`. Failed reports and other readers' reports are not listed |
 | GET | `/research/jobs/{job_id}` | Poll job state |
 | GET | `/research/jobs/{job_id}/events` | SSE progress (API-004) |
-| GET | `/research/{research_id}` | Completed report (409 if it no longer matches the current report schema) |
+| GET | `/research/{research_id}` | Completed report (409 if it no longer matches the current report schema). Public; the frontend `/report/:id` share page reads it (ADR-0061) |
 | GET | `/companies/{ticker}/research/latest` | Latest report (404 if none; 409 if it no longer matches the current schema) |
 | GET | `/research/{research_id}/diff?against=` | What changed since an earlier report of the same company (`against` defaults to the previous completed one; 404 if none). Claims matched by shared cited source per section, cited metrics by latest period, failed sections skipped (ADR-0059) |
 

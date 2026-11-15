@@ -1,5 +1,4 @@
-import { ArrowUpRight, Check, Copy } from "lucide-react";
-import { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 
 import { formatValue } from "../../charts/series";
 import { ApiError } from "../../lib/apiClient";
@@ -9,7 +8,7 @@ import { metricDisplayByName, metricLabel } from "../../lib/metricCatalog";
 import { useSource } from "../../lib/queries";
 import { EXTERNAL_LINK, safeHttpUrl } from "../../lib/safeUrl";
 import type { SourceDetail, SourceRecord } from "../../types";
-import { Button } from "../ui/Button";
+import { CopyButton } from "../ui/CopyButton";
 import { Skeleton } from "../ui/Skeleton";
 import { ErrorState } from "../ui/States";
 import { useCitations } from "./CitationContext";
@@ -88,25 +87,6 @@ function Derivation({
   );
 }
 
-function CopyCitation({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard access denied or unavailable: nothing was copied, so claim nothing.
-    }
-  };
-  return (
-    <Button size="sm" onClick={() => void copy()}>
-      {copied ? <Check aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}
-      <span aria-live="polite">{copied ? "Copied" : "Copy citation"}</span>
-    </Button>
-  );
-}
-
 /** One source, shown in the side panel: what it is, the passage itself, where it sits, and the
  *  way to the original (CIT-002, CIT-006). */
 export function SourceView({ sourceId }: { sourceId: string }) {
@@ -167,7 +147,7 @@ export function SourceView({ sourceId }: { sourceId: string }) {
             <ArrowUpRight aria-hidden className="size-3.5" />
           </a>
         )}
-        <CopyCitation text={`${sourceTitle(source)} — ${original ?? source.source_id}`} />
+        <CopyButton label="Copy citation" text={`${sourceTitle(source)} — ${original ?? source.source_id}`} />
       </div>
     </div>
   );

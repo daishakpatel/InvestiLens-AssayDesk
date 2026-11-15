@@ -37,6 +37,15 @@ class JobState(BaseModel):
     stages: list[JobStage] = []
 
 
+class ResearchSummary(BaseModel):
+    """One row of a reader's research history (§26.2): enough to list it and link to it."""
+
+    research_id: str
+    ticker: str
+    generated_at: str | None = None
+    model: str | None = None
+
+
 class ResearchReportEnvelope(BaseModel):
     research_id: str
     ticker: str

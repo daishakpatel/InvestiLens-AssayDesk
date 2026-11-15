@@ -78,6 +78,7 @@ export type DemoInfo = Schemas["DemoInfo"];
 export type SourceDetail = Schemas["SourceDetail"];
 export type SourceRecord = SourceDetail["source"];
 export type ResearchReportEnvelope = Schemas["ResearchReportEnvelope"];
+export type ResearchSummary = Schemas["ResearchSummary"];
 export type ResearchReport = Schemas["ResearchReport"];
 export type ResearchClaim = Schemas["ResearchClaim"];
 export type Risk = Schemas["Risk"];

@@ -29,6 +29,7 @@ import { RegenerateReport } from "./GenerateReport";
 import { AiMark } from "../ui/AiMark";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
+import { CopyButton } from "../ui/CopyButton";
 import { Feedback } from "../ui/Feedback";
 import { Popover } from "../ui/Popover";
 import { SegmentedControl } from "../ui/SegmentedControl";
@@ -402,6 +403,11 @@ export function ReportDocument({ envelope }: { envelope: ResearchReportEnvelope 
                 <Download aria-hidden className="size-3.5" />
                 Export Markdown
               </Button>
+              <CopyButton
+                variant="ghost"
+                label="Copy link"
+                text={`${window.location.origin}/report/${envelope.research_id}`}
+              />
               <Button variant="ghost" size="sm" onClick={() => window.print()}>
                 <Printer aria-hidden className="size-3.5" />
                 Print

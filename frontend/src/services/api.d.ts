@@ -1213,7 +1213,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List My Research
+         * @description The caller's research history: completed reports they generated, newest first (§26.2).
+         */
+        get: operations["list_my_research_api_v1_research_get"];
         put?: never;
         /** Create Research */
         post: operations["create_research_api_v1_research_post"];
@@ -4174,6 +4178,20 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /**
+         * ResearchSummary
+         * @description One row of a reader's research history (§26.2): enough to list it and link to it.
+         */
+        ResearchSummary: {
+            /** Generated At */
+            generated_at?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Research Id */
+            research_id: string;
+            /** Ticker */
+            ticker: string;
+        };
         /** Risk */
         Risk: {
             /**
@@ -7124,6 +7142,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RedFlagsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_research_api_v1_research_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchSummary"][];
                 };
             };
             /** @description Validation Error */

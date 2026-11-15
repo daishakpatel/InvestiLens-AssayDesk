@@ -7972,6 +7972,47 @@
         "title": "ResearchRequest",
         "type": "object"
       },
+      "ResearchSummary": {
+        "description": "One row of a reader's research history (\u00a726.2): enough to list it and link to it.",
+        "properties": {
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "research_id": {
+            "title": "Research Id",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "research_id",
+          "ticker"
+        ],
+        "title": "ResearchSummary",
+        "type": "object"
+      },
       "Risk": {
         "properties": {
           "category": {
@@ -13976,6 +14017,90 @@
       }
     },
     "/api/v1/research": {
+      "get": {
+        "description": "The caller's research history: completed reports they generated, newest first (\u00a726.2).",
+        "operationId": "list_my_research_api_v1_research_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResearchSummary"
+                  },
+                  "title": "Response List My Research Api V1 Research Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List My Research",
+        "tags": [
+          "Research"
+        ]
+      },
       "post": {
         "operationId": "create_research_api_v1_research_post",
         "parameters": [

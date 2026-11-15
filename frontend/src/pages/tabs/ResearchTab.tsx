@@ -10,7 +10,7 @@ import { useApiStatus } from "../../lib/apiStatus";
 import { useLatestResearch } from "../../lib/queries";
 import { useScrollToHash } from "../../lib/useScrollToHash";
 
-function DocumentSkeleton() {
+export function DocumentSkeleton() {
   return (
     <div role="status" aria-label="Loading research" className="max-w-[720px] space-y-4">
       <Skeleton className="h-7 w-48" />

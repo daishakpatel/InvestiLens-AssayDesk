@@ -29,6 +29,8 @@ const AlertsPage = lazy(() => import("./pages/AlertsPage"));
 const ThesesPage = lazy(() => import("./pages/ThesesPage"));
 const ThesisTab = lazy(() => import("./pages/tabs/ThesisTab"));
 const DemoPage = lazy(() => import("./pages/DemoPage"));
+const ReportPage = lazy(() => import("./pages/ReportPage"));
+const ResearchHistoryPage = lazy(() => import("./pages/ResearchHistoryPage"));
 // Design-system review surface: dev server only, so it never ships in the production bundle.
 const UiGallery = import.meta.env.DEV ? lazy(() => import("./pages/UiGallery")) : null;
 
@@ -77,6 +79,8 @@ export function App() {
           <Route path="alerts" element={<AlertsPage />} />
           <Route path="theses" element={<ThesesPage />} />
           <Route path="demo" element={<DemoPage />} />
+          <Route path="report/:researchId" element={<ReportPage />} />
+          <Route path="research" element={<ResearchHistoryPage />} />
           <Route path="company/:ticker" element={<CompanyDashboard />}>
             <Route index element={<OverviewTab />} />
             <Route path="financials" element={<FinancialsTab />} />

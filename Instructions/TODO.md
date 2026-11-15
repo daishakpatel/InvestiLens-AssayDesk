@@ -115,8 +115,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ### Accounts and user features (§26.2, §36 #24)
 
-- [ ] **Saved reports / research history / saved questions**: reports carry a `user_id` but
-      there is no list endpoint and no UI. `[code]`
+- [x] **Saved reports / research history**: `GET /research` lists the caller's completed reports;
+      "Your research" page (account menu) links each to `/report/:id`, 2026-11-14. The page loads
+      only the first 200. `[code]`
+- [ ] **Saved questions**: chat turns are stored per user but there is no list of past questions. `[code]`
 - [ ] **Watchlist items**: no add/remove-item endpoint; each watched company is its own
       watchlist (ADR-0031 stand-in). Needs `POST/DELETE /watchlists/{id}/items` + a data migration. `[code]`
 - [x] Alerts: `POST /alerts` takes no `config` (price-move threshold, news category);
@@ -134,7 +136,8 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [x] Export: stays client-side (Markdown + print); the 501 stub was removed, 2026-11-10 (ADR-0059).
 - [x] `GET /research/{id}/diff` ("what changed since last report"): built 2026-11-10 (ADR-0059),
       see "Done". `[code]`
-- [ ] Shareable read-only links: not built. `[code]`
+- [x] Shareable read-only links: plain public `/report/:id` page + "Copy link", not revocable
+      because reports are public per company (ADR-0061), 2026-11-14. `[code]`
 - [x] Rejected-claims admin view: `GET /admin/research/{id}/rejected-claims` (counts + reasons from
       `claim_verifications`), 2026-11-14. API only; there is no admin UI for any admin endpoint. `[code]`
 - [x] `POST /feedback/report` stores ratings, 2026-11-11 (ADR-0060), see "Done". Claim-level ratings

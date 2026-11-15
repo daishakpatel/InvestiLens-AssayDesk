@@ -45,6 +45,7 @@ import type {
   ReportDiff,
   ResearchAccepted,
   ResearchReportEnvelope,
+  ResearchSummary,
   SourceDetail,
   ThesisDetail,
   ThesisEvent,
@@ -499,6 +500,13 @@ const report = z.object({
     .object({ research_id: z.string(), generated_at: z.string(), sections: z.array(z.string()) })
     .nullish(),
 });
+const researchSummary = z.object({
+  research_id: z.string(),
+  ticker: z.string(),
+  generated_at: z.string().nullish(),
+  model: z.string().nullish(),
+});
+
 const researchEnvelope = z.object({
   research_id: z.string(),
   ticker: z.string(),
@@ -1252,6 +1260,8 @@ export const parse = {
   token: (d: unknown): TokenResponse => token.parse(d) as TokenResponse,
   profile: (d: unknown): UserProfile => profile.parse(d) as UserProfile,
   demoInfo: (d: unknown): DemoInfo => demoInfo.parse(d) as DemoInfo,
+  researchHistory: (d: unknown): ResearchSummary[] =>
+    z.array(researchSummary).parse(d) as ResearchSummary[],
   researchEnvelope: (d: unknown): ResearchReportEnvelope =>
     researchEnvelope.parse(d) as ResearchReportEnvelope,
   reportDiff: (d: unknown): ReportDiff => reportDiff.parse(d) as ReportDiff,

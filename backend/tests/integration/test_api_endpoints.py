@@ -504,6 +504,30 @@ def test_research_diff_against_previous_report(
     assert client.get(f"{_P}/research/{new.id}/diff", params={"against": new.id}).status_code == 404
 
 
+def test_research_history_lists_own_completed_reports(
+    client: TestClient, session: Session, seed: dict[str, int]
+) -> None:
+    """§26.2: a reader's research history is their completed reports, newest first, paged."""
+    rows = [
+        ResearchReport(company_id=seed["company"], user_id=seed["user"], status="complete"),
+        ResearchReport(company_id=seed["company"], user_id=seed["user"], status="failed"),
+        ResearchReport(company_id=seed["company"], user_id=seed["admin"], status="complete"),
+        ResearchReport(company_id=seed["company"], user_id=seed["user"], status="complete"),
+    ]
+    session.add_all(rows)
+    session.flush()
+    h = auth_headers(seed["user"])
+    assert client.get(f"{_P}/research").status_code == 401
+
+    first = client.get(f"{_P}/research?limit=1", headers=h)
+    assert [r["research_id"] for r in first.json()] == [str(rows[3].id)]
+    assert first.json()[0]["ticker"] == "TST"
+    cursor = first.headers["X-Next-Cursor"]
+    second = client.get(f"{_P}/research?limit=1&cursor={cursor}", headers=h)
+    assert [r["research_id"] for r in second.json()] == [str(rows[0].id)]
+    assert "X-Next-Cursor" not in second.headers
+
+
 def test_report_feedback_is_stored_once_per_reader(
     client: TestClient, session: Session, seed: dict[str, int]
 ) -> None:
