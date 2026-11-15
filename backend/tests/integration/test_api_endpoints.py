@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.main import app
 from app.models import (
+    ClaimVerification,
     Company,
     DataFreshness,
     Document,
@@ -586,6 +587,37 @@ def test_admin_role_gated(client: TestClient, seed: dict[str, int]) -> None:
     assert runs.status_code == 200 and runs.json()[0]["source"] == "sec"
     refresh = client.post(f"{_P}/admin/companies/TST/refresh", headers=admin_h)
     assert refresh.status_code == 202 and refresh.json()["status"] == "queued"
+
+
+def test_admin_rejected_claims(client: TestClient, session: Session, seed: dict[str, int]) -> None:
+    """§10.16: admins see counts and reasons for claims validation dropped (CIT-005)."""
+    report = ResearchReport(company_id=seed["company"], status="complete")
+    session.add(report)
+    session.flush()
+    for status, reason in [
+        ("accepted", None),
+        ("rejected", "NUMERIC_MISMATCH"),
+        ("rejected", "NUMERIC_MISMATCH"),
+        ("softened", "OVERREACH"),
+    ]:
+        session.add(
+            ClaimVerification(
+                report_id=report.id,
+                claim_text="c",
+                source_ids=["s1"],
+                status=status,
+                reason_code=reason,
+            )
+        )
+    session.flush()
+    url = f"{_P}/admin/research/{report.id}/rejected-claims"
+    assert client.get(url, headers=auth_headers(seed["user"])).status_code == 403
+    body = client.get(url, headers=auth_headers(seed["admin"])).json()
+    assert body["checked"] == 4
+    assert body["counts"] == {"NUMERIC_MISMATCH": 2, "OVERREACH": 1}
+    assert [c["status"] for c in body["claims"]] == ["rejected", "rejected", "softened"]
+    missing = f"{_P}/admin/research/999999/rejected-claims"
+    assert client.get(missing, headers=auth_headers(seed["admin"])).status_code == 404
 
 
 def test_data_freshness_meta(client: TestClient, seed: dict[str, int]) -> None:

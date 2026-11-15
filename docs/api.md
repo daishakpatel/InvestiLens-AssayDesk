@@ -248,6 +248,12 @@ a single digest notification.
 | GET | `/admin/ingestion-runs` |
 | GET | `/admin/eval-runs` |
 | POST | `/admin/companies/{ticker}/refresh` |
+| GET | `/admin/research/{research_id}/rejected-claims` |
+
+`rejected-claims` (spec §10.16, CIT-005) reads `claim_verifications` for one report: `checked` (every
+claim the validator saw), `counts` (reason code → number of rejected or softened claims; a missing
+code counts as `UNSPECIFIED`), and `claims` (each rejected/softened claim with its status, reason,
+source ids, entailment label and numeric match). 404 for an unknown report.
 
 ### Comparison & portfolio (Phase 6a, §37.1/§37.2)
 | Method | Path | Notes |

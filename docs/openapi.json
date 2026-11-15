@@ -7354,6 +7354,121 @@
         "title": "RegisterRequest",
         "type": "object"
       },
+      "RejectedClaim": {
+        "properties": {
+          "claim_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Id"
+          },
+          "entailment_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entailment Label"
+          },
+          "numeric_match": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numeric Match"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "source_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Ids",
+            "type": "array"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "title": "RejectedClaim",
+        "type": "object"
+      },
+      "RejectedClaims": {
+        "description": "Claims validation removed or softened in one report (spec \u00a710.16, CIT-005).",
+        "properties": {
+          "checked": {
+            "title": "Checked",
+            "type": "integer"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/RejectedClaim"
+            },
+            "title": "Claims",
+            "type": "array"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "research_id": {
+            "title": "Research Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "research_id",
+          "checked",
+          "counts",
+          "claims"
+        ],
+        "title": "RejectedClaims",
+        "type": "object"
+      },
       "ReportDiff": {
         "description": "GET /research/{id}/diff: what changed since an earlier report (spec \u00a710.16).",
         "properties": {
@@ -10009,6 +10124,65 @@
           }
         },
         "summary": "List Ingestion Runs",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/api/v1/admin/research/{research_id}/rejected-claims": {
+      "get": {
+        "description": "Counts and reasons for claims citation validation removed or softened (spec \u00a710.16).",
+        "operationId": "rejected_claims_api_v1_admin_research__research_id__rejected_claims_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "research_id",
+            "required": true,
+            "schema": {
+              "title": "Research Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectedClaims"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rejected Claims",
         "tags": [
           "Admin"
         ]

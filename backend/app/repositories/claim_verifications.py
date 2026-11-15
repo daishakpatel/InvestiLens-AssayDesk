@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import ClaimVerification
@@ -42,3 +43,13 @@ def record_verifications(
     for claim in claims:
         record_citation_verification(claim.status)
     return len(rows)
+
+
+def list_for_report(session: Session, report_id: int) -> Sequence[ClaimVerification]:
+    """Every logged claim for one report, in insertion order (admin view, spec §10.16)."""
+    stmt = (
+        select(ClaimVerification)
+        .where(ClaimVerification.report_id == report_id)
+        .order_by(ClaimVerification.id)
+    )
+    return session.scalars(stmt).all()

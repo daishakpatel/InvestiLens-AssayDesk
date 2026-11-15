@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
@@ -9,11 +11,19 @@ from app.api.deps import require_admin
 from app.api.pagination import NEXT_CURSOR_HEADER, clamp_limit, decode_cursor, encode_cursor
 from app.config import get_settings
 from app.db import get_db
+from app.repositories import claim_verifications as claim_repo
 from app.repositories import companies as company_repo
 from app.repositories import eval_runs as eval_repo
 from app.repositories import ingestion as ingestion_repo
 from app.repositories import jobs as job_repo
-from app.schemas.admin import EvalRunSummary, IngestionRunSummary, RefreshAccepted
+from app.repositories import reports as report_repo
+from app.schemas.admin import (
+    EvalRunSummary,
+    IngestionRunSummary,
+    RefreshAccepted,
+    RejectedClaim,
+    RejectedClaims,
+)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -79,3 +89,29 @@ def refresh_company(ticker: str, db: Session = _DB, _: int = _ADMIN) -> RefreshA
 
         refresh_company_data.delay(company.ticker)
     return RefreshAccepted(ticker=company.ticker, job_id=str(job.id), status="queued")
+
+
+@router.get("/research/{research_id}/rejected-claims", response_model=RejectedClaims)
+def rejected_claims(research_id: int, db: Session = _DB, _: int = _ADMIN) -> RejectedClaims:
+    """Counts and reasons for claims citation validation removed or softened (spec §10.16)."""
+    if report_repo.get_report(db, research_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"research report {research_id} not found")
+    rows = claim_repo.list_for_report(db, research_id)
+    dropped = [r for r in rows if r.status != "accepted"]
+    return RejectedClaims(
+        research_id=str(research_id),
+        checked=len(rows),
+        counts=dict(Counter(r.reason_code or "UNSPECIFIED" for r in dropped)),
+        claims=[
+            RejectedClaim(
+                claim_id=r.claim_id,
+                text=r.claim_text,
+                status=r.status,
+                reason_code=r.reason_code,
+                source_ids=list(r.source_ids or []),
+                entailment_label=r.entailment_label,
+                numeric_match=r.numeric_match,
+            )
+            for r in dropped
+        ],
+    )

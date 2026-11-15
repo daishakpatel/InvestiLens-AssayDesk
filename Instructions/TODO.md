@@ -135,7 +135,8 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [x] `GET /research/{id}/diff` ("what changed since last report"): built 2026-11-10 (ADR-0059),
       see "Done". `[code]`
 - [ ] Shareable read-only links: not built. `[code]`
-- [ ] Rejected-claims admin view: not built (data is logged in `claim_verifications`). `[notes]`
+- [x] Rejected-claims admin view: `GET /admin/research/{id}/rejected-claims` (counts + reasons from
+      `claim_verifications`), 2026-11-14. API only; there is no admin UI for any admin endpoint. `[code]`
 - [x] `POST /feedback/report` stores ratings, 2026-11-11 (ADR-0060), see "Done". Claim-level ratings
       are accepted by the API but the report page only offers the whole-report thumbs. `[code]`
 

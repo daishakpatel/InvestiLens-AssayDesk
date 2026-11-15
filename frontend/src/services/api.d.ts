@@ -58,6 +58,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/research/{research_id}/rejected-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rejected Claims
+         * @description Counts and reasons for claims citation validation removed or softened (spec §10.16).
+         */
+        get: operations["rejected_claims_api_v1_admin_research__research_id__rejected_claims_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/alerts": {
         parameters: {
             query?: never;
@@ -3952,6 +3972,42 @@ export interface components {
              */
             password: string;
         };
+        /** RejectedClaim */
+        RejectedClaim: {
+            /** Claim Id */
+            claim_id?: string | null;
+            /** Entailment Label */
+            entailment_label?: string | null;
+            /** Numeric Match */
+            numeric_match?: boolean | null;
+            /** Reason Code */
+            reason_code?: string | null;
+            /**
+             * Source Ids
+             * @default []
+             */
+            source_ids: string[];
+            /** Status */
+            status?: string | null;
+            /** Text */
+            text?: string | null;
+        };
+        /**
+         * RejectedClaims
+         * @description Claims validation removed or softened in one report (spec §10.16, CIT-005).
+         */
+        RejectedClaims: {
+            /** Checked */
+            checked: number;
+            /** Claims */
+            claims: components["schemas"]["RejectedClaim"][];
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Research Id */
+            research_id: string;
+        };
         /**
          * ReportDiff
          * @description GET /research/{id}/diff: what changed since an earlier report (spec §10.16).
@@ -4923,6 +4979,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IngestionRunSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rejected_claims_api_v1_admin_research__research_id__rejected_claims_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                research_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RejectedClaims"];
                 };
             };
             /** @description Validation Error */
