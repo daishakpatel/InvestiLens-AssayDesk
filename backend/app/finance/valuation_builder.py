@@ -287,7 +287,10 @@ def build_company_valuation(session: Session, company: Company) -> int:
             if eps is not None:
                 # Reported EPS sits on the year end's share basis; restate it for any later split.
                 eps = eps / split_factor(splits, year_end[fy], price.day)
-            basis = {"fiscal_year": f"FY{fy}", "figures": "fiscal year (not TTM)"}
+            basis = {
+                "fiscal_year": f"FY{fy}",
+                "figures": "fiscal year: the twelve months to the year end",
+            }
         else:
             count = count_as_of(counts, price.day)
             quarter_end, found = figures_as_of(facts, cmap, price.day)

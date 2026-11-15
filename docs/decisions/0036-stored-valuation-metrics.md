@@ -1,6 +1,7 @@
 # ADR-0036: Store valuation multiples per fiscal year and at the latest close
 
-- **Status:** Accepted
+- **Status:** Accepted; the latest-close row's fiscal-year figures were replaced by TTM as filed
+  by the price date in ADR-0046 (Phase 7h)
 - **Date:** 2026-10-14
 - **Spec refs:** §10.7, §11.6, §11.7, §12, FR-024, DR-025, DR-026, DR-042, CIT-003
 

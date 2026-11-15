@@ -73,9 +73,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ### Data
 
-- [ ] **Valuation uses fiscal-year figures, not TTM** (ADR-0036): P/E late in a fiscal year uses
-      earnings up to ten months old. TTM EPS, revenue, FCF and EBITDA are stored since Phase 7b
-      (ADR-0040, `period_type` TTM); switching `valuation_builder` to them is Phase 7h. `[code]`
+- [x] **Valuation uses fiscal-year figures, not TTM** (ADR-0036): already fixed in Phase 7h
+      (ADR-0046); confirmed 2026-11-15. The latest-close rows behind every *current* multiple
+      (header, report, portfolio, peers, earnings, thesis KPIs) use TTM as filed by the price date
+      (e.g. NVDA P/E 20.35 on TTM to 2026-07-26). Fiscal-year rows use that year's figures, which
+      are the TTM at the year end; only `/compare` reads them, by design. `[code]`
 - [ ] **AMD pretax income and AMD/Intel D&A are not mapped quarterly**: their tags are missing
       from the concept map, so `metric_gaps` lists them and their TTM effective tax rate, ROIC
       and EBITDA are absent (checked 2026-10-21 on the dev DB). `[code]`
