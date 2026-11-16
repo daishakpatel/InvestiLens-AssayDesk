@@ -7,6 +7,8 @@ document-chunk anchor as the default) keeps resolution unambiguous:
 - ``derived:…`` (or a `financial_metrics.source_id` match) → derived_metric (with lineage, CIT-003)
 - ``derived:<TICKER>:revenue_<yoy|cagr>:FY<start>-FY<end>`` → the same, computed from those two
   years' stored revenue (ADR-0055)
+- ``derived:<TICKER>:<valuation multiple>:<YYYY-MM-DD>`` → the multiple at that close, rebuilt
+  from what was filed by then once its stored latest-close row was replaced (ADR-0063)
 - ``redflag:<TICKER>:<rule>:<accession>`` → the flag's quoted filing text as a text_chunk, with
   the filing as the deep link (Phase 7e, FR-RF-008)
 - ``price:<TICKER>:<date>[:<end_date>]`` → price_bar: that trading day's bar, or two days' closes
@@ -19,12 +21,21 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.finance.display import describe_metric, format_price
 from app.finance.metrics import cagr, yoy_growth
+from app.finance.valuation_builder import (
+    LATEST_TTM_SINCE,
+    VALUATION_METRICS,
+    PricePoint,
+    metric_flags,
+    stored_name,
+    valuation_at_close,
+)
 from app.models import (
     Company,
     Document,
@@ -48,6 +59,8 @@ from app.schemas.sources import (
 )
 
 _REVENUE_GROWTH = re.compile(r"derived:([^:]+):revenue_(yoy|cagr):FY(\d{4})-FY(\d{4})")
+_DATED_VALUATION = re.compile(r"derived:([^:]+):([a-z_]+):(\d{4}-\d{2}-\d{2})")
+_NUMERIC_SCALE = Decimal("0.00000001")  # financial_metrics.metric_value is NUMERIC(28, 8)
 
 
 def _news(row: News) -> SourceDetail:
@@ -180,11 +193,52 @@ def resolve_source(session: Session, source_id: str) -> SourceDetail | None:
     growth = _REVENUE_GROWTH.fullmatch(source_id)
     if growth:
         return _revenue_growth(session, source_id, growth)
+    dated = _DATED_VALUATION.fullmatch(source_id)
+    if dated and dated[2] in VALUATION_METRICS:
+        return _valuation_on(session, source_id, dated)
     if source_id.startswith("xbrl:"):
         fact = session.get(FinancialFact, _as_int(source_id.split(":", 1)[1]))
         return _xbrl(fact) if fact else None
     chunk = session.scalar(select(DocumentChunk).where(DocumentChunk.paragraph_id == source_id))
     return _chunk(session, chunk) if chunk else None
+
+
+def _valuation_on(session: Session, source_id: str, match: re.Match[str]) -> SourceDetail | None:
+    """A latest-close multiple a report cited, rebuilt for that close after the next price run
+    replaced its row: same close, shares and TTM figures as filed by then, so the same value."""
+    ticker, name = match[1], match[2]
+    try:
+        day = date.fromisoformat(match[3])
+    except ValueError:
+        return None
+    if day < LATEST_TTM_SINCE:  # cited under the earlier method: its value can't be rebuilt
+        return None
+    company = session.scalar(select(Company).where(Company.ticker == ticker))
+    if company is None:
+        return None
+    close = session.scalar(
+        select(PriceHistory.close).where(
+            PriceHistory.company_id == company.id, PriceHistory.date == day
+        )
+    )
+    if close is None:  # only a stored trading day was ever a latest close
+        return None
+    results, basis = valuation_at_close(session, company, PricePoint(day, close))
+    result = next((r for r in results if stored_name(r) == name), None)
+    if result is None:
+        return None
+    return _metric(
+        FinancialMetric(  # never added to the session: recomputed, as stored then
+            source_id=source_id,
+            metric_name=name,
+            period=day.isoformat(),
+            metric_value=None if result.value is None else result.value.quantize(_NUMERIC_SCALE),
+            unit=result.unit,
+            is_derived=True,
+            formula_id=name,
+            quality_flags=metric_flags(result, basis),
+        )
+    )
 
 
 def _revenue_growth(session: Session, source_id: str, match: re.Match[str]) -> SourceDetail | None:

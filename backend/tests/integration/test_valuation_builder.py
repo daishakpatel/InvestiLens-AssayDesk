@@ -7,6 +7,7 @@ counts moved across splits), DR-042 (bank EV multiples are N/A, never zero).
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -16,13 +17,14 @@ from alembic.config import Config
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
+from app.citation import resolver
 from app.citation.resolver import resolve_source
 from app.finance.builder import build_company_metrics
 from app.finance.ratio_builder import build_company_ratios
 from app.finance.valuation_builder import LATEST, VALUATION_METRICS, build_company_valuation
 from app.ingestion.prices import ingest_prices
 from app.ingestion.sec import ingest_company
-from app.models import Company, FinancialMetric
+from app.models import Company, FinancialMetric, PriceHistory
 from app.providers.prices.mock import MockPriceSource
 from app.providers.sec.mock import MockSecSource
 from app.repositories import metrics as metric_repo
@@ -152,3 +154,49 @@ def test_the_citation_panel_lists_the_price_without_a_dead_link(
     pe = next(r for r in _rows(session, nvda, "pe_ratio") if r.period_type == LATEST)
     assert (pe.quality_flags or {})["basis"]["figures"].startswith("TTM to ")
     assert (detail.text or "").startswith("Price-to-earnings ratio as of ")
+
+
+def test_a_replaced_latest_close_citation_still_resolves(
+    session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:  # CIT-002, FR-024, ADR-0063
+    """A report cites the latest-close P/E; the next price run replaces that row. The dated ID
+    must still open, with the value the report saw, rebuilt from what was known that day."""
+    # The price fixture ends before the real TTM cut-over date; move it before the fixture.
+    monkeypatch.setattr(resolver, "LATEST_TTM_SINCE", date(2026, 1, 1))
+    nvda = _company(session, "NVDA", tmp_path)
+    cited = {
+        r.metric_name: (r.source_id, r.metric_value)
+        for name in ("pe_ratio", "market_cap")
+        for r in _rows(session, nvda, name)
+        if r.period_type == LATEST
+    }
+    assert cited["pe_ratio"][0] == "derived:NVDA:pe_ratio:2026-09-30"
+
+    session.add(
+        PriceHistory(
+            company_id=nvda.id,
+            date=date(2026, 10, 1),
+            close=Decimal("999.00"),
+            adj_close=Decimal("999.00"),
+            volume=1,
+            provider="mock",
+        )
+    )
+    session.flush()
+    build_company_valuation(session, nvda)
+    latest = next(r for r in _rows(session, nvda, "pe_ratio") if r.period_type == LATEST)
+    assert latest.source_id == "derived:NVDA:pe_ratio:2026-10-01"  # the old row is gone
+
+    for source_id, value in cited.values():
+        detail = resolve_source(session, source_id or "")
+        assert detail is not None, source_id
+        assert detail.source.value == value  # type: ignore[union-attr]  # derived_metric
+        assert detail.lineage
+    # Only a stored trading day was ever a latest close; other metrics keep their own schemes.
+    assert resolve_source(session, "derived:NVDA:pe_ratio:2026-09-27") is None  # a Sunday
+    assert resolve_source(session, "derived:NVDA:roe:2026-09-30") is None
+
+    # An ID from before the latest-close method switched to TTM is not rebuilt: its value would
+    # contradict the report that quoted it.
+    monkeypatch.setattr(resolver, "LATEST_TTM_SINCE", date(2026, 10, 24))
+    assert resolve_source(session, cited["pe_ratio"][0] or "") is None

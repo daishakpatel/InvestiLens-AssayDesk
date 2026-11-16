@@ -128,7 +128,7 @@ the frontend as a typed client (`frontend/src/services/api.d.ts`).
 ### Sources (citation modal)
 | Method | Path | Notes |
 |--------|------|-------|
-| GET | `/sources/{source_id}` | Source record + span + deep link (CIT-006). A `redflag:<TICKER>:<rule_key>:<accession>` ID resolves to the flag's quoted filing text as a `text_chunk` (section path `[form, label]`), with the filing as `deep_link` (Phase 7e). |
+| GET | `/sources/{source_id}` | Source record + span + deep link (CIT-006). A `redflag:<TICKER>:<rule_key>:<accession>` ID resolves to the flag's quoted filing text as a `text_chunk` (section path `[form, label]`), with the filing as `deep_link` (Phase 7e). A dated valuation ID `derived:<TICKER>:<multiple>:<YYYY-MM-DD>` whose latest-close row a later price run replaced is rebuilt for that close from what was filed by then; IDs dated before 2026-10-24 stay 404 (ADR-0063). |
 
 ### Guidance vs actual (Phase 7i, FR-GD-014, ADR-0047)
 | Method | Path | Notes |

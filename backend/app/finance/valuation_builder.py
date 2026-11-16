@@ -41,6 +41,10 @@ from app.schemas.sources import MetricResult
 
 SHARES_CONCEPT = "dei:EntityCommonStockSharesOutstanding"
 LATEST = "LATEST"
+# The latest-close row has used TTM as filed by the price date since ADR-0046; an ID dated earlier
+# was computed from fiscal-year figures, so recomputing it now would contradict the report that
+# cited it (ADR-0063). Any future change to `valuation_at_close` must move this date forward.
+LATEST_TTM_SINCE = date(2026, 10, 24)
 _DERIVED_ACCESSION = "derived"  # non-null sentinel so the upsert key is idempotent (as ratios)
 # Stored names follow the metric catalog (frontend + valuation endpoint), not the formula ids.
 _NAMES = {"ev_to_revenue": "ev_revenue", "ev_to_ebitda": "ev_ebitda"}
@@ -190,7 +194,7 @@ def _persist(
     period_end: date,
     basis: dict[str, str],
 ) -> None:
-    name = _NAMES.get(result.formula_id, result.formula_id)
+    name = stored_name(result)
     metrics_repo.upsert_metric(
         session,
         company_id=company.id,
@@ -208,13 +212,23 @@ def _persist(
         source_id=f"derived:{company.ticker}:{name}:{period}",
         as_reported_accession=_DERIVED_ACCESSION,
         is_latest=True,
-        quality_flags={
-            "inputs": [{"name": i.name, "source_id": i.source_id} for i in result.inputs],
-            "formula_version": result.formula_version,
-            "warnings": result.warnings,
-            "basis": basis,  # FR-024: what the multiple was computed from
-        },
+        quality_flags=metric_flags(result, basis),
     )
+
+
+def stored_name(result: MetricResult) -> str:
+    """The catalog name a multiple is stored and cited under (`ev_to_revenue` → `ev_revenue`)."""
+    return _NAMES.get(result.formula_id, result.formula_id)
+
+
+def metric_flags(result: MetricResult, basis: dict[str, str]) -> dict[str, object]:
+    """A valuation row's lineage record: inputs, formula version, warnings and basis (FR-024)."""
+    return {
+        "inputs": [{"name": i.name, "source_id": i.source_id} for i in result.inputs],
+        "formula_version": result.formula_version,
+        "warnings": result.warnings,
+        "basis": basis,  # FR-024: what the multiple was computed from
+    }
 
 
 def load_splits(session: Session, company_id: int) -> list[tuple[date, Decimal]]:
@@ -228,6 +242,69 @@ def load_splits(session: Session, company_id: int) -> list[tuple[date, Decimal]]
         ).all()
         if d is not None and r
     ]
+
+
+def _valued(
+    *,
+    price: PricePoint,
+    count: ShareCount | None,
+    splits: Sequence[tuple[date, Decimal]],
+    figures: dict[str, Decimal | None],
+    sources: dict[str, str],
+    eps: Decimal | None,
+    net_income: Decimal | None,
+    ev_applies: bool,
+    basis: dict[str, str],
+) -> tuple[list[MetricResult], dict[str, str]]:
+    """Every multiple at one close, with the basis that makes it reproducible (FR-024)."""
+    shares = shares_on(count, price.day, splits) if count else None
+    basis = basis | {"price_date": price.day.isoformat(), "price_close": str(price.close)}
+    if count is not None and shares is not None:
+        basis |= {"shares": str(shares), "shares_record_date": count.record_date.isoformat()}
+    results = _compute(
+        price=price,
+        shares=shares,
+        shares_source=count.source_id if count else None,
+        value=figures,
+        source=sources,
+        eps=eps,
+        ev_applies=ev_applies,
+        net_income=net_income,
+    )
+    return results, basis
+
+
+def valuation_at_close(
+    session: Session, company: Company, price: PricePoint
+) -> tuple[list[MetricResult], dict[str, str]]:
+    """The multiples at one close from what was filed by then (ADR-0046): the latest share count
+    and TTM figures as filed by the price date. Builds the latest-close row, and recomputes an
+    earlier one that a report cited after the row itself was replaced (ADR-0063)."""
+    cmap = load_concept_map(ticker=company.ticker, cik=company.cik, sector=company.sector)
+    facts = with_composites(
+        [fact_view_from_orm(f) for f in facts_repo.facts_for_company(session, company.id)],
+        cmap.composites,
+    )
+    quarter_end, found = figures_as_of(facts, cmap, price.day)
+    derived = derived_values(found)
+    return _valued(
+        price=price,
+        count=count_as_of(share_counts(session, company.id), price.day),
+        splits=load_splits(session, company.id),
+        figures={name: value for name, (value, _) in derived.items()},
+        # One input row per figure, citing its first fact; `ttm_sources` lists them all.
+        sources={name: ids[0] for name, (_, ids) in derived.items() if ids},
+        eps=None,
+        net_income=derived["net_income"][0] if "net_income" in derived else None,
+        ev_applies=cmap.applies("ev_ebitda"),  # EV-based multiples are N/A for banks
+        basis={
+            "figures": f"TTM to {quarter_end.isoformat() if quarter_end else 'n/a'}, "
+            "as filed by the price date",
+            "ttm_sources": ";".join(
+                f"{n}={','.join(ids)}" for n, (_, ids) in sorted(derived.items())
+            ),
+        },
+    )
 
 
 def build_company_valuation(session: Session, company: Company) -> int:
@@ -273,54 +350,14 @@ def build_company_valuation(session: Session, company: Company) -> int:
     cmap = load_concept_map(ticker=company.ticker, cik=company.cik, sector=company.sector)
     ev_applies = cmap.applies("ev_ebitda")  # EV-based multiples are N/A for banks (Appendix C)
 
-    facts = with_composites(
-        [fact_view_from_orm(f) for f in facts_repo.facts_for_company(session, company.id)],
-        cmap.composites,
-    )
-
-    def run(fy: int, price: PricePoint, period: str, period_type: str) -> int:
-        net_income: Decimal | None = None
-        if period_type == "FY":
-            count = share_count_for(counts, year_end[fy])
-            figures, sources = value[fy], source.get(fy, {})
-            eps = figures.get("eps_diluted")
-            if eps is not None:
-                # Reported EPS sits on the year end's share basis; restate it for any later split.
-                eps = eps / split_factor(splits, year_end[fy], price.day)
-            basis = {
-                "fiscal_year": f"FY{fy}",
-                "figures": "fiscal year: the twelve months to the year end",
-            }
-        else:
-            count = count_as_of(counts, price.day)
-            quarter_end, found = figures_as_of(facts, cmap, price.day)
-            derived = derived_values(found)
-            figures = {name: value for name, (value, _) in derived.items()}
-            # One input row per figure, citing its first fact; `ttm_sources` lists them all.
-            sources = {name: ids[0] for name, (_, ids) in derived.items() if ids}
-            eps, net_income = None, figures.get("net_income")
-            basis = {
-                "fiscal_year": f"FY{fy}",
-                "figures": f"TTM to {quarter_end.isoformat() if quarter_end else 'n/a'}, "
-                "as filed by the price date",
-                "ttm_sources": ";".join(
-                    f"{n}={','.join(ids)}" for n, (_, ids) in sorted(derived.items())
-                ),
-            }
-        shares = shares_on(count, price.day, splits) if count else None
-        basis |= {"price_date": price.day.isoformat(), "price_close": str(price.close)}
-        if count is not None and shares is not None:
-            basis.update(shares=str(shares), shares_record_date=count.record_date.isoformat())
-        results = _compute(
-            price=price,
-            shares=shares,
-            shares_source=count.source_id if count else None,
-            value=figures,
-            source=sources,
-            eps=eps,
-            ev_applies=ev_applies,
-            net_income=net_income,
-        )
+    def persist(
+        results: list[MetricResult],
+        basis: dict[str, str],
+        fy: int,
+        price: PricePoint,
+        period: str,
+        period_type: str,
+    ) -> int:
         for result in results:
             _persist(
                 session,
@@ -337,8 +374,29 @@ def build_company_valuation(session: Session, company: Company) -> int:
     written = 0
     for fy in sorted(year_end):
         price = price_on_or_before(prices, year_end[fy])
-        if price is not None:  # no price history that far back: nothing to value
-            written += run(fy, price, f"FY{fy}", "FY")
-    latest_fy = max(year_end)
-    written += run(latest_fy, prices[-1], prices[-1].day.isoformat(), LATEST)
+        if price is None:  # no price history that far back: nothing to value
+            continue
+        eps = value[fy].get("eps_diluted")
+        if eps is not None:
+            # Reported EPS sits on the year end's share basis; restate it for any later split.
+            eps = eps / split_factor(splits, year_end[fy], price.day)
+        results, basis = _valued(
+            price=price,
+            count=share_count_for(counts, year_end[fy]),
+            splits=splits,
+            figures=value[fy],
+            sources=source.get(fy, {}),
+            eps=eps,
+            net_income=None,
+            ev_applies=ev_applies,
+            basis={
+                "fiscal_year": f"FY{fy}",
+                "figures": "fiscal year: the twelve months to the year end",
+            },
+        )
+        written += persist(results, basis, fy, price, f"FY{fy}", "FY")
+    latest_fy, latest = max(year_end), prices[-1]
+    results, basis = valuation_at_close(session, company, latest)
+    basis = {"fiscal_year": f"FY{latest_fy}"} | basis
+    written += persist(results, basis, latest_fy, latest, latest.day.isoformat(), LATEST)
     return written

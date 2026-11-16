@@ -103,8 +103,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       statement's own lines; AMD FY2025 $3,050M, $46M of non-acquisition intangible amortization
       counted twice because AMD's statement line uses its own tag). AMD tagged no D&A before 2022,
       so its EV/EBITDA for those year ends stays `missing_input`. `[code]`
-- [ ] A latest-close valuation is replaced on every price run, so a report that cited yesterday's
-      dated ID (`derived:NVDA:pe_ratio:<date>`) no longer resolves it. `[code]`
+- [x] A latest-close valuation is replaced on every price run, so a report that cited yesterday's
+      dated ID (`derived:NVDA:pe_ratio:<date>`) no longer resolved it. Fixed 2026-11-15 (ADR-0063):
+      `/sources/{id}` rebuilds it for that close from what was filed by then. IDs dated before
+      2026-10-24 (fiscal-year method) stay 404, since rebuilding them would contradict their
+      report. `[code]`
 - [ ] **Seed universe is 5 of 10 in dev, 3 in fixtures** (fixtures: NVDA, AAPL, JPM). Missing
       MSFT, AMZN, TSLA, GOOGL (multi-class shares), META, V, MA (§4.1). `[code]`
 - [x] **News is sample data**: fixed in the dev database, see "Done", 2026-11-02. The fixtures,
