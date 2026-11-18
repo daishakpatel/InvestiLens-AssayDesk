@@ -387,6 +387,10 @@ cascade. Thesis text is never written to logs or metrics (SEC-TH-002).
 
 ### Alerts and notifications (Phase 7a, ADR-0039)
 
+Since ADR-0064 `notifications.emailed_at` is the email outbox: dispatch creates the row, and the
+`send_alerts` task emails committed rows with no `emailed_at`, one per commit. `price_history.ingested_at`
+is when a bar was first stored (a re-fetch keeps it), which `price_move` reads to find new bars.
+
 `alerts`: `event_type` (a key in `app/alerts/registry.py`), `params` JSONB (validated against that
 type's params model; `{}` = defaults), `channels` `VARCHAR(16)[]` (subset of `in_app`, `email`),
 `enabled`, `company_id` (nullable: NULL means every company on the owner's watchlist, read at
@@ -442,3 +446,4 @@ Migrations are tested up and down, on empty and populated databases, in
 | `f186174c8045` | Add `earnings_events` (unique `uq_earnings_events_period`, CHECKs `status_known`, `source_known`, `report_time_known`) and `earnings_briefs` (unique `uq_earnings_briefs_inputs` and `uq_earnings_briefs_version`, CHECK `kind_known`, `content` JSONB); FKs to companies `ON DELETE CASCADE`. Phase 7j, FR-EB-001/007, ADR-0048. |
 | `69ec64a10d9e` | Add `theses` (FKs to users and companies `ON DELETE CASCADE`, CHECKs `stance_known`/`status_known`), `thesis_kpis` (CHECKs `comparator_known`/`state_known`), `thesis_events` (CHECK `kind_known`, `kpi_id` `ON DELETE SET NULL`, partial unique `uq_thesis_events_link`) and `thesis_revisions` (PK `(thesis_id, revision)`); child FKs `ON DELETE CASCADE`. Phase 7k, FR-TH-001, ADR-0049. |
 | `c3e8a1f5d7b2` | `watchlist_items` unique `uq_watchlist_items_watchlist_id_company_id (watchlist_id, company_id)` (duplicates removed first). Data: each user's one-company lists named by ticker (ADR-0031 stand-in) become items on their oldest such list, renamed "Watchlist"; the others are deleted. Downgrade drops the constraint only. ADR-0062. |
+| `d4f9b2a6c8e1` | `notifications.emailed_at` (nullable): the email outbox. Existing `email` rows are set to `created_at` (already sent). Downgrade drops the column. ADR-0064. |

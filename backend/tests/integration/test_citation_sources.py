@@ -28,6 +28,7 @@ from app.models import (
     Company,
     Document,
     DocumentChunk,
+    Filing,
     FinancialFact,
     FinancialMetric,
     News,
@@ -310,3 +311,31 @@ def test_price_ids_resolve_to_market_data(session: Session) -> None:  # CIT-006,
         "price:NOPE:2026-09-28",
     ):
         assert resolve_source(session, missing) is None
+
+
+def test_filing_ids_resolve_to_the_filing(session: Session) -> None:  # CIT-006, FR-AL-018
+    """An alert's or an earnings brief's `filing:<id>` opens as the filing, linked to EDGAR."""
+    company = Company(ticker="FIL", cik="0000000077", name="Filing Corp")
+    session.add(company)
+    session.flush()
+    doc = Document(company_id=company.id, document_type="filing", source_tier=1, content_hash="f1")
+    session.add(doc)
+    session.flush()
+    filing = Filing(
+        document_id=doc.id,
+        company_id=company.id,
+        filing_type="8-K",
+        filing_date=date(2026, 11, 5),
+        accession_number="0000000077-26-000001",
+        primary_document_url="https://www.sec.gov/Archives/fil-8k.htm",
+        items=["2.02", "9.01"],
+    )
+    session.add(filing)
+    session.flush()
+
+    detail = resolve_source(session, f"filing:{filing.id}")
+    assert detail is not None and isinstance(detail.source, TextChunkSource)
+    assert detail.text == "FIL 8-K filed 2026-11-05 (items 2.02, 9.01)"
+    assert detail.deep_link == "https://www.sec.gov/Archives/fil-8k.htm"
+    assert resolve_source(session, "filing:999999999") is None
+    assert resolve_source(session, "filing:abc") is None

@@ -69,6 +69,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
   - [ ] Judge calibration ≥ 0.85 against a 50-question human-labelled sample (none committed). `[notes]`
   - [ ] Re-tune `rag_sufficiency_min_score`, entailment and confidence thresholds on real
         embeddings; decide reranker (ADR-0014) and entailment verifier (ADR-0015). `[notes]`
+- [ ] **`retrieval_mrr` in the published eval is not deterministic** (found 2026-11-17): identical
+      mock runs gave 0.7933, 0.7822, 0.7711 with no code change; the other six metrics are stable
+      and mock embeddings are SHA-256-based, so tied retrieval scores are likely ordered without a
+      tie-break. The 2026-11-15 note that blamed commit 262ddb2 for an MRR shift was wrong. `[code]`
 - [ ] **Load test never run**: every row of the NFR table in `docs/testing.md` says `_not yet run_`. `[code]`
 
 ### Data
@@ -135,25 +139,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       notifications, `/alerts` settings page. `[code]` / `[notes]`
 - [ ] Email: no delivery provider for verify-email / password-reset; `email_verified_at` gates
       nothing; SMTP backend unproven. `[code]` / `[notes]`
-- [ ] Alerts (Phase 7a leftovers): `filing:<id>` evidence ids don't resolve via
-      `GET /sources/{id}` (the UI maps them to routes; `price:` ids resolve since ADR-0054);
-      email is sent before the dispatch job commits, so a crash in that window can resend one (ADR-0039); `price_move` checks only the
-      newest bar per company. `[code]`
-
-### Report-level features (§10.16)
-
-- [x] Export: stays client-side (Markdown + print); the 501 stub was removed, 2026-11-10 (ADR-0059).
-- [x] `GET /research/{id}/diff` ("what changed since last report"): built 2026-11-10 (ADR-0059),
-      see "Done". `[code]`
-- [x] Shareable read-only links: plain public `/report/:id` page + "Copy link", not revocable
-      because reports are public per company (ADR-0061), 2026-11-14. `[code]`
-- [x] Rejected-claims admin view: `GET /admin/research/{id}/rejected-claims` (counts + reasons from
-      `claim_verifications`), 2026-11-14. API only; there is no admin UI for any admin endpoint. `[code]`
-- [x] `POST /feedback/report` stores ratings, 2026-11-11 (ADR-0060), see "Done". Claim-level ratings
-      are accepted by the API but the report page only offers the whole-report thumbs. `[code]`
-
-### Deployment and tests
-
+- [x] Alerts (Phase 7a leftovers), fixed 2026-11-17 (ADR-0064): `filing:<id>` evidence ids now
+      resolve via `GET /sources/{id}` (filing named, EDGAR link); email goes out from a committed
+      outbox (`notifications.emailed_at`), so a crash repeats at most one email; `price_move`
+      checks every newly stored bar, not just the newest, and ignores first loads and backfills
+      (price upserts keep `ingested_at` as first-stored). `[code]`
 - [ ] **Hosted demo** (§36 #23): built but not deployed → 37 (ADR-0050). `DEMO_MODE` is wired
       (fixtures, recorded answers, shared sandbox, IP limits, banner, `/demo`), `render.yaml` is
       the ~$30/mo demo blueprint, and `scripts/vertical_slice.sh` passes on a local demo build.

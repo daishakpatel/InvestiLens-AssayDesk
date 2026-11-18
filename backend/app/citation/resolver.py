@@ -9,6 +9,8 @@ document-chunk anchor as the default) keeps resolution unambiguous:
   years' stored revenue (ADR-0055)
 - ``derived:<TICKER>:<valuation multiple>:<YYYY-MM-DD>`` → the multiple at that close, rebuilt
   from what was filed by then once its stored latest-close row was replaced (ADR-0063)
+- ``filing:<id>`` → a whole filing (an alert's new 10-Q, the two filings an earnings brief compares)
+  as a text_chunk naming it, with the filing on EDGAR as the deep link
 - ``redflag:<TICKER>:<rule>:<accession>`` → the flag's quoted filing text as a text_chunk, with
   the filing as the deep link (Phase 7e, FR-RF-008)
 - ``price:<TICKER>:<date>[:<end_date>]`` → price_bar: that trading day's bar, or two days' closes
@@ -40,6 +42,7 @@ from app.models import (
     Company,
     Document,
     DocumentChunk,
+    Filing,
     FinancialFact,
     FinancialMetric,
     News,
@@ -181,6 +184,8 @@ def resolve_source(session: Session, source_id: str) -> SourceDetail | None:
         return _red_flag(session, source_id)
     if source_id.startswith("price:"):
         return _price(session, source_id)
+    if source_id.startswith("filing:"):
+        return _filing(session, source_id)
     # A canonical metric's own source_id (base or derived) resolves first — its scheme may itself
     # start with "xbrl:"/"derived:", so this precedes the raw-fact prefix branch below.
     metric = session.scalar(
@@ -346,6 +351,31 @@ def _price(session: Session, source_id: str) -> SourceDetail | None:
     )
     # Tier 4 claims are framed as reported by the outlet (spec §15).
     return SourceDetail(source=source, text=f"{text} ({provider} end-of-day data)")
+
+
+def _filing(session: Session, source_id: str) -> SourceDetail | None:
+    """A whole filing: which company's form, filed when, for which period, and a link to it."""
+    row = session.get(Filing, _as_int(source_id.split(":", 1)[1]))
+    if row is None:
+        return None
+    company = session.get(Company, row.company_id)
+    text = f"{company.ticker if company else 'Company'} {row.filing_type}"
+    if row.filing_date:
+        text += f" filed {row.filing_date.isoformat()}"
+    if row.period_end:
+        text += f", for the period ending {row.period_end.isoformat()}"
+    if row.items:
+        text += f" (items {', '.join(row.items)})"
+    source = TextChunkSource(
+        source_id=source_id,
+        tier=1,
+        document_id=str(row.document_id),
+        section_path=[row.filing_type],
+        text=text,
+    )
+    return SourceDetail(
+        source=source, text=text, deep_link=row.primary_document_url or row.source_url
+    )
 
 
 def _red_flag(session: Session, source_id: str) -> SourceDetail | None:

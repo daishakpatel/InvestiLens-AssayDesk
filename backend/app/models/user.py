@@ -159,9 +159,10 @@ class ChatMessage(Base, TimestampMixin):
 class Notification(Base, TimestampMixin):
     """An in-app notification delivered to a user by the alert-dispatch job (§26.2, Phase 5d).
 
-    Email delivery (when configured) is a side effect of dispatch; this row is the durable in-app
-    record the user can read via `GET /notifications`. `alert_id` is nullable so a notification
-    survives deletion of the rule that produced it (SET NULL)."""
+    This row is the durable in-app record the user reads via `GET /notifications`, and for the
+    email channel also the outbox: `emailed_at` is set once its email went out (ADR-0064).
+    `alert_id` is nullable so a notification survives deletion of the rule that produced it
+    (SET NULL)."""
 
     __tablename__ = "notifications"
 
@@ -173,6 +174,7 @@ class Notification(Base, TimestampMixin):
     body: Mapped[str | None] = mapped_column(Text)
     channel: Mapped[str] = mapped_column(String(16), default="in_app")  # in_app|email
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    emailed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Deterministic id of the event(s) behind this row; unique per alert so a re-run or an
     # overlapping run can never deliver the same event twice (FR-AL-007).
     event_key: Mapped[str | None] = mapped_column(String(256))

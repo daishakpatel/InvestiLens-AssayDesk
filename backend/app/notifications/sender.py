@@ -1,7 +1,8 @@
-"""Notification delivery (§26.2, SEC-014, ADR-0025).
+"""Notification delivery (§26.2, SEC-014, ADR-0025, ADR-0064).
 
 Every notification is persisted as an in-app row (durable, readable via `GET /notifications`).
-When the alert's channel is `email`, it is *also* sent through the configured email backend:
+When the alert's channel is `email`, that row is also the outbox: `send_pending_emails` sends it
+after the dispatch that created it has committed, through the configured email backend:
 - `LogEmailBackend` (default) — no SMTP provider is configured in this project, so email is
   logged (PII-safe: recipient + subject, never body secrets) rather than silently dropped.
 - `SmtpEmailBackend` — real SMTP when the SMTP_* settings are provided.
@@ -14,12 +15,14 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
-from app.models import User
+from app.models import Notification, User
 from app.repositories import notifications as notif_repo
 from app.utils.logging import get_logger, log_event
 
@@ -66,10 +69,8 @@ def get_email_backend(settings: Settings | None = None) -> EmailBackend:
 
 
 class NotificationSender:
-    """Persists an in-app notification and, for the `email` channel, also sends an email."""
-
-    def __init__(self, email_backend: EmailBackend | None = None) -> None:
-        self._email = email_backend or get_email_backend()
+    """Persists a notification once per (alert, event_key); its email is sent later, from the
+    committed row, by `send_pending_emails` (ADR-0064)."""
 
     def send(
         self,
@@ -84,8 +85,7 @@ class NotificationSender:
         channels: list[str],
         payload: dict[str, Any],
     ) -> bool:
-        """Deliver once per (alert, event_key). False when it was already delivered, in which case
-        no email goes out either (FR-AL-007)."""
+        """Create the notification. False when it was already delivered (FR-AL-007)."""
         created = notif_repo.create_once(
             session,
             user_id=user.id,
@@ -97,8 +97,47 @@ class NotificationSender:
             channel="email" if "email" in channels else "in_app",
             payload=payload,
         )
-        if created is None:
-            return False
-        if "email" in channels:
-            self._email.send(to=user.email, subject=title, body=body)
-        return True
+        return created is not None
+
+
+def send_pending_emails(session: Session, backend: EmailBackend | None = None) -> int:
+    """Send every committed email notification not yet sent; returns how many went out.
+
+    Each row is claimed with `FOR UPDATE SKIP LOCKED`, so overlapping runs never send the same
+    one, and marked and committed on its own, so a crash repeats at most one email. A send that
+    fails is logged and stays pending for the next run."""
+    backend = backend or get_email_backend()
+    failed: list[int] = []
+    sent = 0
+    while True:
+        row = session.scalar(
+            select(Notification)
+            .where(
+                Notification.channel == "email",
+                Notification.emailed_at.is_(None),
+                Notification.id.not_in(failed),
+            )
+            .order_by(Notification.id)
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        )
+        if row is None:
+            return sent
+        user = session.get(User, row.user_id)
+        try:
+            if user is None:
+                raise LookupError("recipient gone")
+            backend.send(to=user.email, subject=row.title, body=row.body or "")
+        except Exception as exc:  # one bad send must not hold up the rest
+            log_event(
+                logger,
+                logging.ERROR,
+                "notification.email.failed",
+                notification_id=row.id,
+                error=type(exc).__name__,
+            )
+            failed.append(row.id)
+            continue
+        row.emailed_at = datetime.now(UTC)
+        session.commit()
+        sent += 1

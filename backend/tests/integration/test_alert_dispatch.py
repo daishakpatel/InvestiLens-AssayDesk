@@ -43,9 +43,10 @@ from app.models import (
     Watchlist,
     WatchlistItem,
 )
-from app.notifications.sender import EmailBackend, NotificationSender
+from app.notifications.sender import EmailBackend, send_pending_emails
 from app.observability.metrics import REGISTRY
 from app.repositories import notifications as notif_repo
+from app.repositories import prices as prices_repo
 from tests.fakes import auth_headers
 
 _P = "/api/v1"
@@ -188,6 +189,93 @@ def test_price_move_dispatches_when_over_threshold(session: Session) -> None:
     assert notif.event_key == "price_move:MOV:2026-10-08"
 
 
+def _bars(session: Session, company: Company, closes: dict[date, tuple[str, float]]) -> None:
+    """Bars by date: (close, minutes from now when first stored)."""
+    for day, (close, minutes) in closes.items():
+        session.add(
+            PriceHistory(
+                company_id=company.id,
+                date=day,
+                close=Decimal(close),
+                provider="mock",
+                ingested_at=_later(minutes),
+            )
+        )
+    session.flush()
+
+
+def test_price_move_checks_every_day_a_run_catches_up(session: Session) -> None:
+    """A run that stores two missed days checks both, each against the day before it."""
+    company = _company(session, "CUP")
+    alert = _alert(
+        session,
+        _user(session, "catchup@example.com"),
+        company,
+        event_type="price_move",
+        params={"threshold": 0.05},
+    )
+    day_before = -60 * 24
+    _bars(
+        session,
+        company,
+        {
+            date(2026, 10, 7): ("100.00", day_before),
+            date(2026, 10, 8): ("110.00", 1),  # +10% on a day the old check never looked at
+            date(2026, 10, 9): ("111.00", 1),  # +0.9%: under the threshold
+        },
+    )
+
+    assert check_and_dispatch(session, now=_later(2)) == 1
+    [notif] = _notes(session, alert)
+    assert notif.event_key == "price_move:CUP:2026-10-08"
+
+
+def test_price_move_ignores_history_and_a_first_load(session: Session) -> None:
+    """Years of bars stored at once (a new company) count only their newest day, and an older
+    date backfilled later is history, not news."""
+    fresh, known = _company(session, "FRS"), _company(session, "OLD")
+    user = _user(session, "history@example.com")
+    first_load = _alert(session, user, fresh, event_type="price_move", params={"threshold": 0.05})
+    backfill = _alert(session, user, known, event_type="price_move", params={"threshold": 0.05})
+    _bars(
+        session,
+        fresh,
+        {
+            date(2026, 10, 7): ("100.00", 1),
+            date(2026, 10, 8): ("150.00", 1),  # +50%, but part of the first load
+            date(2026, 10, 9): ("151.00", 1),
+        },
+    )
+    _bars(
+        session,
+        known,
+        {
+            date(2026, 10, 8): ("100.00", -60 * 24),
+            date(2026, 10, 9): ("101.00", -60 * 24),
+            date(2026, 10, 1): ("50.00", 1),  # an old date stored now: not a new move
+            date(2026, 10, 2): ("100.00", 1),
+        },
+    )
+
+    assert check_and_dispatch(session, now=_later(2)) == 0
+    assert _notes(session, first_load) == [] and _notes(session, backfill) == []
+
+
+def test_a_refetched_bar_keeps_when_it_was_first_stored(session: Session) -> None:
+    """Every price run re-fetches years of bars; `ingested_at` must not move, or every old bar
+    would look new to the price alert."""
+    company = _company(session, "RFT")
+    first = _later(-60)
+    bar = {"company_id": company.id, "date": date(2026, 10, 7), "close": Decimal("10.00")}
+    prices_repo.upsert_price_bars(session, company.id, [bar | {"ingested_at": first}])
+    prices_repo.upsert_price_bars(
+        session, company.id, [bar | {"close": Decimal("11.00"), "ingested_at": _later(0)}]
+    )
+    row = session.scalars(select(PriceHistory).where(PriceHistory.company_id == company.id)).one()
+    session.refresh(row)
+    assert row.close == Decimal("11.00") and row.ingested_at == first
+
+
 def test_news_alert_filters_by_category(session: Session) -> None:
     """FR-AL-003: the news type fires per new item, limited to the chosen category."""
     company = _company(session, "NWS")
@@ -206,23 +294,40 @@ def test_news_alert_filters_by_category(session: Session) -> None:
     assert notif.title == "New earnings news for NWS" and notif.body == "Q3 results beat"
 
 
-def test_email_channel_invokes_email_backend(session: Session) -> None:
+def test_email_goes_out_from_the_committed_outbox(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-0064: dispatch only creates the notification; its email is sent afterwards, once, and
+    a failed send stays pending for the next run instead of being lost or repeated (FR-AL-007)."""
+    monkeypatch.setattr(session, "commit", session.flush)  # keep writes in the test transaction
     company = _company(session, "EML")
     user = _user(session, "emailme@example.com")
     _alert(session, user, company, channels=["in_app", "email"])
     _ingest_8k(session, company, at=_later(1))
 
     captured: list[tuple[str, str]] = []
+    down = True
 
-    class _CapturingBackend(EmailBackend):
+    class _FlakyBackend(EmailBackend):
         def send(self, *, to: str, subject: str, body: str) -> None:
+            if down:
+                raise ConnectionError("smtp down")
             captured.append((to, subject))
 
-    sender = NotificationSender(email_backend=_CapturingBackend())
-    assert check_and_dispatch(session, sender=sender, now=_later(2)) == 1
+    assert check_and_dispatch(session, now=_later(2)) == 1
+    assert captured == []  # nothing is emailed inside the dispatch transaction
+    assert send_pending_emails(session, _FlakyBackend()) == 0  # provider down: stays pending
+    [notif] = session.scalars(select(Notification).where(Notification.user_id == user.id)).all()
+    assert notif.channel == "email" and notif.emailed_at is None
+
+    down = False
+    assert send_pending_emails(session, _FlakyBackend()) == 1
     assert captured == [("emailme@example.com", "New 8-K for EML")]
-    # A re-run delivers nothing, so no second email either (FR-AL-007).
-    assert check_and_dispatch(session, sender=sender, now=_later(3)) == 0
+    assert notif.emailed_at is not None
+    # Neither a re-run of the outbox nor of dispatch sends it again.
+    assert send_pending_emails(session, _FlakyBackend()) == 0
+    assert check_and_dispatch(session, now=_later(3)) == 0
+    assert send_pending_emails(session, _FlakyBackend()) == 0
     assert len(captured) == 1
 
 

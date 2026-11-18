@@ -46,13 +46,16 @@ def bar_on_or_before(session: Session, *, company_id: int, day: date) -> PriceHi
 
 
 def upsert_price_bars(session: Session, company_id: int, bars: list[dict[str, Any]]) -> int:
-    """Upsert daily bars by (company_id, date). Returns the number of rows written."""
+    """Upsert daily bars by (company_id, date). Returns the number of rows written.
+
+    `ingested_at` stays the time a bar was first stored: every run re-fetches years of bars, and
+    price alerts read it to tell a new bar from history."""
     if not bars:
         return 0
     stmt = pg_insert(PriceHistory)
     update_cols = {
         c: stmt.excluded[c]
-        for c in ("open", "high", "low", "close", "adj_close", "volume", "provider", "ingested_at")
+        for c in ("open", "high", "low", "close", "adj_close", "volume", "provider")
     }
     stmt = stmt.values(bars).on_conflict_do_update(
         index_elements=[PriceHistory.company_id, PriceHistory.date], set_=update_cols

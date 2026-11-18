@@ -2,15 +2,16 @@
 same triggers as the Phase 5d/6b dispatch (FR-AL-003).
 
 Event time for filings and news is the *ingestion* time (`created_at`) and for prices the bar's
-`ingested_at`: the 30-minute SLA is measured from when Assay Desk learns of an event, which the
-EDGAR poller (≤10 min) and the 5-minute dispatch together bound.
+`ingested_at`, when the bar was first stored (a re-fetch keeps it): the 30-minute SLA is measured
+from when Assay Desk learns of an event, which the EDGAR poller (≤10 min) and the 5-minute
+dispatch together bound.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
@@ -130,56 +131,67 @@ def _price_event(
 def detect_price_moves(
     session: Session, alert: Alert, since: datetime, until: datetime
 ) -> list[DetectedEvent]:
-    """Fire when a company's newest daily bar, ingested inside the window, closed at least
-    `threshold` away from the bar before it."""
+    """Fire for each daily bar first stored inside the window that closed at least `threshold`
+    away from the bar before it, so a run that catches up several days checks every one of them.
+
+    Only bars dated after the newest bar stored before the window count (a longer backfill of
+    old dates is history, not news), and a company's first load counts only its newest bar."""
     params = PriceMoveParams.model_validate(alert.params)
     company_ids = scope_company_ids(session, alert)
-    rank = (
-        func.row_number()
-        .over(partition_by=PriceHistory.company_id, order_by=PriceHistory.date.desc())
-        .label("rank")
-    )
-    ranked = (
+    company, day = PriceHistory.company_id, PriceHistory.date
+    lagged = (
         select(
             PriceHistory.company_id,
             PriceHistory.date,
             PriceHistory.close,
             PriceHistory.ingested_at,
-            rank,
+            func.lag(PriceHistory.date).over(partition_by=company, order_by=day).label("prev_date"),
+            func.lag(PriceHistory.close)
+            .over(partition_by=company, order_by=day)
+            .label("prev_close"),
         )
         .where(PriceHistory.company_id.in_(company_ids))
         .subquery()
     )
-    bars: dict[int, list[tuple[date, Decimal | None, datetime | None]]] = {}
-    for company_id, bar_date, close, ingested_at, _rank in session.execute(
-        select(ranked).where(ranked.c.rank <= 2).order_by(ranked.c.company_id, ranked.c.rank)
-    ):
-        bars.setdefault(company_id, []).append((bar_date, close, ingested_at))
+    known = (
+        select(PriceHistory.company_id, func.max(PriceHistory.date).label("last_date"))
+        .where(PriceHistory.company_id.in_(company_ids), PriceHistory.ingested_at <= since)
+        .group_by(PriceHistory.company_id)
+        .subquery()
+    )
+    rows = session.execute(
+        select(lagged, known.c.last_date)
+        .outerjoin(known, known.c.company_id == lagged.c.company_id)
+        .where(lagged.c.ingested_at > since, lagged.c.ingested_at <= until)
+        .where((known.c.last_date.is_(None)) | (lagged.c.date > known.c.last_date))
+        .order_by(lagged.c.company_id, lagged.c.date)
+    ).all()
+    new_bars: dict[int, list[Any]] = {}
+    for row in rows:
+        new_bars.setdefault(row.company_id, []).append(row)
 
-    tickers = tickers_by_id(session, bars)
+    tickers = tickers_by_id(session, new_bars)
     threshold = Decimal(str(params.threshold))
     events: list[DetectedEvent] = []
-    for company_id, pair in bars.items():
-        if len(pair) < 2:
-            continue
-        (bar_date, close, ingested_at), (prev_date, prev_close, _) = pair
-        if ingested_at is None or not since < ingested_at <= until:
-            continue
-        if close is None or not prev_close:
-            continue
-        move = (close - prev_close) / prev_close
-        if abs(move) >= threshold:
-            events.append(
-                _price_event(
-                    company_id=company_id,
-                    ticker=tickers[company_id],
-                    prev_date=prev_date,
-                    bar_date=bar_date,
-                    move=move,
-                    threshold=params.threshold,
-                    at=ingested_at,
+    for company_id, bars in new_bars.items():
+        if bars[0].last_date is None:  # first load: years of history arrive at once
+            bars = bars[-1:]
+        for bar in bars:
+            if bar.close is None or not bar.prev_close:
+                continue
+            move = (bar.close - bar.prev_close) / bar.prev_close
+            if abs(move) >= threshold:
+                events.append(
+                    _price_event(
+                        company_id=company_id,
+                        ticker=tickers[company_id],
+                        prev_date=bar.prev_date,
+                        bar_date=bar.date,
+                        move=move,
+                        threshold=params.threshold,
+                        at=bar.ingested_at,
+                    )
                 )
-            )
     return events
 
 

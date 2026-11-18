@@ -11,6 +11,7 @@ from app.alerts.dispatch import check_and_dispatch
 from app.config import get_settings
 from app.earnings.service import due_previews, try_generate
 from app.models import Company
+from app.notifications.sender import send_pending_emails
 from app.redflags.detect import scan_company
 from app.repositories import companies as company_repo
 from app.repositories.chat import purge_messages_before
@@ -26,7 +27,10 @@ def send_alerts(self: Task) -> int:
     Scheduled every few minutes so the DoD's 30-minute dispatch SLA holds even in the worst case
     (EDGAR poll ≤10 min to ingest + this to notice)."""
     with job_task(self, job_type="send_alerts") as (session, _progress):
-        return check_and_dispatch(session)
+        created = check_and_dispatch(session)
+        session.commit()  # the notifications exist before any email about them goes out
+        send_pending_emails(session)
+        return created
 
 
 @celery_app.task(bind=True, queue="batch", name="scan_red_flags", **RETRY_KWARGS)

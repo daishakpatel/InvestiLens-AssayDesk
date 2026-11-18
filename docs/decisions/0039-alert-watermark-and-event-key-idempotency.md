@@ -1,6 +1,6 @@
 # ADR-0039: Per-alert watermark plus unique (alert_id, event_key) for alert idempotency
 
-- **Status:** Accepted
+- **Status:** Accepted; its email-before-commit gap is closed by ADR-0064
 - **Date:** 2026-10-21
 - **Spec refs:** §26.2, §37.4, FR-AL-001 … FR-AL-018 (Appendix H)
 

@@ -246,3 +246,30 @@ def test_watchlist_standins_merge_into_one_list(alembic_cfg: Config, test_engine
     command.downgrade(alembic_cfg, "69ec64a10d9e")  # reverses cleanly
     command.downgrade(alembic_cfg, "base")  # leave no rows behind for later tests
     command.upgrade(alembic_cfg, "head")
+
+
+def test_email_outbox_marks_old_emails_sent(alembic_cfg: Config, test_engine: Engine) -> None:
+    """ADR-0064: email rows from before the outbox already went out; the first outbox run must
+    not send them again, so the migration marks them sent. In-app rows stay unmarked."""
+    command.downgrade(alembic_cfg, "base")
+    command.upgrade(alembic_cfg, "c3e8a1f5d7b2")
+    with test_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO users (email, password_hash, role, is_active)"
+                " VALUES ('o@example.com', 'x', 'user', true);"
+                "INSERT INTO notifications (user_id, title, channel)"
+                " SELECT id, 'sent by email', 'email' FROM users;"
+                "INSERT INTO notifications (user_id, title, channel)"
+                " SELECT id, 'in app only', 'in_app' FROM users;"
+            )
+        )
+    command.upgrade(alembic_cfg, "d4f9b2a6c8e1")
+    with test_engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT title, emailed_at = created_at FROM notifications ORDER BY id")
+        ).all()
+    assert [tuple(r) for r in rows] == [("sent by email", True), ("in app only", None)]
+    command.downgrade(alembic_cfg, "c3e8a1f5d7b2")  # reverses cleanly
+    command.downgrade(alembic_cfg, "base")  # leave no rows behind for later tests
+    command.upgrade(alembic_cfg, "head")
