@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from selectolax.parser import HTMLParser
 
 from app.ingestion.documents.normalize import normalize_text
-from app.ingestion.documents.tables import ExtractedTable, extract_table
+from app.ingestion.documents.tables import _UNIT_HINT, ExtractedTable, extract_table
 
 # Null-free sentinel: the HTML parser strips \x00, so use an unlikely ASCII token instead.
 _SENTINEL = "zqztablezqz{}zqz"
@@ -59,4 +59,17 @@ def linearize(tree: HTMLParser) -> list[Block]:
             normalized = normalize_text(line)
             if normalized:
                 blocks.append(Block(kind="text", text=normalized))
+
+    # Filers often print the unit on a line above the table ("(In millions, except ...)"), not in
+    # it; without it in the caption the verifier reads "112,010" as dollars (CH-003, CIT-005).
+    for i, block in enumerate(blocks):
+        table = block.table
+        if table is None or _UNIT_HINT.search(table.caption):
+            continue
+        for prev in reversed(blocks[max(0, i - 2) : i]):
+            if prev.kind == "table":
+                break
+            if hit := _UNIT_HINT.search(prev.text):
+                table.caption += f", in {hit.group(1).lower()}"
+                break
     return blocks

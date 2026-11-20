@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-20T03:35:37+00:00",
-  "git_sha": "15a2e9d689fe64cbc6cbbf04c4e107689bce9bb9",
+  "generated_at": "2026-11-20T04:35:24+00:00",
+  "git_sha": "f6c34b3bb459693d61141e6094f653cf5b3eb8d3",
   "dirty": true,
-  "inputs_hash": "4d0342abebee993e40d5d2686c742b4806d76e10656826e401b59cf525cbbdc8",
+  "inputs_hash": "a045d4b954c4639484b227903e5959122e9de82e082d0782f8cdb0aa70112057",
   "llm": {
     "mode": "live",
     "model": "gemini-3.8-flash"
@@ -25,20 +25,20 @@
   "metrics": {
     "citation_validity": {
       "value": 1.0,
-      "successes": 314,
-      "n": 314,
+      "successes": 344,
+      "n": 344,
       "ci95": [
-        0.9879,
+        0.989,
         1.0
       ]
     },
     "number_match": {
-      "value": 0.9724,
-      "successes": 211,
-      "n": 217,
+      "value": 0.9931,
+      "successes": 289,
+      "n": 291,
       "ci95": [
-        0.941,
-        0.9873
+        0.9753,
+        0.9981
       ]
     },
     "correct_abstention": {
@@ -51,26 +51,26 @@
       ]
     },
     "false_abstention": {
-      "value": 0.1341,
-      "successes": 11,
+      "value": 0.0854,
+      "successes": 7,
       "n": 82,
       "ci95": [
-        0.0766,
-        0.2245
+        0.042,
+        0.1659
       ]
     },
     "retrieval_hit_at_5": {
       "value": 1.0,
-      "successes": 45,
-      "n": 45,
+      "successes": 42,
+      "n": 42,
       "ci95": [
-        0.9213,
+        0.9162,
         1.0
       ]
     },
     "retrieval_mrr": {
-      "value": 0.8148,
-      "n": 45
+      "value": 0.8135,
+      "n": 42
     },
     "injection_resistance": {
       "value": 1.0,
@@ -85,12 +85,12 @@
   "latency": {
     "chat": {
       "p50_ms": 16.0,
-      "p95_ms": 6989.0,
+      "p95_ms": 7457.0,
       "n": 112
     },
     "report": {
-      "p50_ms": 60518.25008401647,
-      "p95_ms": 71579.14675003849,
+      "p50_ms": 58856.294416007586,
+      "p95_ms": 65868.56704100501,
       "n": 3
     },
     "note": "Single-user timings with the live model on the machine that ran the report."
@@ -106,11 +106,11 @@
     "by_purpose": {
       "chat": {
         "calls": 111,
-        "usd": "0.2595"
+        "usd": "0.2331"
       },
       "earnings_brief": {
         "calls": 1,
-        "usd": "0.0034"
+        "usd": "0.0035"
       },
       "embedding": {
         "calls": 32,
@@ -126,13 +126,13 @@
       },
       "note_summary": {
         "calls": 8,
-        "usd": "0.0302"
+        "usd": "0.0310"
       },
       "report_section": {
         "calls": 36,
-        "usd": "0.2204"
+        "usd": "0.2219"
       }
     },
-    "total_usd": "0.6410"
+    "total_usd": "0.6170"
   }
 }

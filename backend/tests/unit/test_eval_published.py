@@ -20,7 +20,7 @@ from app.eval.published import (
     wilson_interval,
 )
 from app.schemas.citations import SourceDetail
-from app.schemas.sources import DerivedMetricSource
+from app.schemas.sources import DerivedMetricSource, TextChunkSource
 
 _ROOT = Path(__file__).resolve().parents[3]
 
@@ -98,6 +98,23 @@ def test_answer_checks_resolve_sources_and_match_numbers(monkeypatch: pytest.Mon
     assert out["citations_valid"] == 1 and out["citations_total"] == 3
     # 71.07% matches the 0.7107 ratio; 9 has no resolvable source.
     assert out["numbers_matched"] == 1 and out["numbers_total"] == 2
+
+
+def test_answer_check_reads_a_table_at_its_stated_unit(monkeypatch: pytest.MonkeyPatch) -> None:
+    # NFR-ME-002, CIT-005: the verifier accepts "$19,827 million" from a cell of 19,827 in a table
+    # "in millions"; the published check counted the same figure as a miss (17 in the live run).
+    text = "Financial table, 2024-2025, in millions\n| Net revenue | 19,827 |"
+    detail = SourceDetail(
+        source=TextChunkSource(source_id="t1", tier=1, document_id="d1", text=text), text=text
+    )
+    monkeypatch.setattr(published, "resolve_source", lambda _s, sid: detail)
+    out = check_answer(
+        None,  # type: ignore[arg-type]  # resolver is patched
+        "Net revenue was $19,827 million [1].",
+        [(1, "t1")],
+        rel_tol=0.01,
+    )
+    assert out["numbers_matched"] == 1 and out["numbers_total"] == 1
 
 
 # --- NFR-ME-004: thresholds and freshness each fail the gate -------------------------------

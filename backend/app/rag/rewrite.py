@@ -21,6 +21,7 @@ _SYNONYMS: dict[str, str] = {
     "fcf": "free cash flow",
     "r&d": "research and development",
     "capex": "capital expenditures",
+    "capital spending": "capital expenditures",
     "sg&a": "selling general and administrative",
     "eps": "earnings per share",
     "top line": "revenue",
@@ -36,7 +37,8 @@ _SINCE = re.compile(r"\bsince\s+(?:fy)?(\d{4})\b", re.IGNORECASE)
 _EXPLICIT_YEAR = re.compile(r"\b(?:fy)?(20\d{2})\b", re.IGNORECASE)
 _LATEST = re.compile(r"\b(latest|current|most recent|this (year|quarter)|today)\b", re.IGNORECASE)
 _OVER_TIME = re.compile(
-    r"\b(over time|over the (last|past)|trend|grow(n|th)?|chang(e|ed|ing)|history|"
+    r"\b(over time|over the (last|past)|recent (fiscal )?years|trend|grow(n|th)?|"
+    r"chang(e|ed|ing)|history|"
     r"year[- ]over[- ]year|yoy|each year|annually)\b",
     re.IGNORECASE,
 )

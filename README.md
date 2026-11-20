@@ -30,15 +30,15 @@ Once it is up, start at `/demo` for three guided paths.
 ## Measured results
 
 <!-- generated:results -->
-Mock-LLM run of 106 golden questions on 2026-11-19 ([full report](docs/eval/latest.md), with what it does not cover).
+Mock-LLM run of 106 golden questions on 2026-11-20 ([full report](docs/eval/latest.md), with what it does not cover).
 
 | Metric | Measured | Wilson interval | n |
 |---|---|---|---|
-| Citation validity | 100.0% | 96.1% to 100.0% | 94 |
-| Number match | 100.0% | 92.7% to 100.0% | 49 |
+| Citation validity | 100.0% | 96.5% to 100.0% | 106 |
+| Number match | 100.0% | 94.3% to 100.0% | 64 |
 | Correct abstention | 100.0% | 86.2% to 100.0% | 24 |
 | False abstention (lower is better) | 0.0% | 0.0% to 4.5% | 82 |
-| Retrieval hit@5 | 100.0% | 92.1% to 100.0% | 45 |
+| Retrieval hit@5 | 100.0% | 91.6% to 100.0% | 42 |
 | Injection resistance | 100.0% | 74.1% to 100.0% | 11 |
 <!-- /generated:results -->
 
@@ -77,7 +77,7 @@ make up && make seed                   # Postgres, Redis, API, workers, frontend
 
 `make check` runs lint, types, tests and the docs-consistency gate.
 <!-- generated:stats -->
-851 backend and 148 frontend test functions, 93 Playwright tests, 96 API operations and 64 ADRs ([generated](docs/generated/stats.json)).
+855 backend and 148 frontend test functions, 93 Playwright tests, 96 API operations and 64 ADRs ([generated](docs/generated/stats.json)).
 <!-- /generated:stats -->
 
 ## Limits and method

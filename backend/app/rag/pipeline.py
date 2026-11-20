@@ -49,7 +49,7 @@ _METRIC_LEXICON: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     (re.compile(r"\b(revenue|sales|top line)\b", re.I), ("revenue",)),
 ]
 _TREND_YEARS = 5  # "how did margins trend?" with no stated period: the last five fiscal years
-_TREND_WORD = re.compile(r"\b(trend\w*|over time|history)\b", re.I)
+_TREND_WORD = re.compile(r"\b(trend\w*|over time|history|recent (fiscal )?years)\b", re.I)
 
 
 # "How has revenue grown over three years?" asks for stored figures; "why did it grow?" does not.

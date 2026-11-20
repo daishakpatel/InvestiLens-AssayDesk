@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-19T03:19:50+00:00",
-  "git_sha": "15a2e9d689fe64cbc6cbbf04c4e107689bce9bb9",
+  "generated_at": "2026-11-20T04:37:54+00:00",
+  "git_sha": "f6c34b3bb459693d61141e6094f653cf5b3eb8d3",
   "dirty": true,
-  "inputs_hash": "4d0342abebee993e40d5d2686c742b4806d76e10656826e401b59cf525cbbdc8",
+  "inputs_hash": "a045d4b954c4639484b227903e5959122e9de82e082d0782f8cdb0aa70112057",
   "llm": {
     "mode": "mock",
     "model": "FakeLLM (deterministic)"
@@ -25,19 +25,19 @@
   "metrics": {
     "citation_validity": {
       "value": 1.0,
-      "successes": 94,
-      "n": 94,
+      "successes": 106,
+      "n": 106,
       "ci95": [
-        0.9607,
+        0.965,
         1.0
       ]
     },
     "number_match": {
       "value": 1.0,
-      "successes": 49,
-      "n": 49,
+      "successes": 64,
+      "n": 64,
       "ci95": [
-        0.9273,
+        0.9434,
         1.0
       ]
     },
@@ -61,16 +61,16 @@
     },
     "retrieval_hit_at_5": {
       "value": 1.0,
-      "successes": 45,
-      "n": 45,
+      "successes": 42,
+      "n": 42,
       "ci95": [
-        0.9213,
+        0.9162,
         1.0
       ]
     },
     "retrieval_mrr": {
-      "value": 0.7544,
-      "n": 45
+      "value": 0.7488,
+      "n": 42
     },
     "injection_resistance": {
       "value": 1.0,
@@ -84,13 +84,13 @@
   },
   "latency": {
     "chat": {
-      "p50_ms": 10.0,
-      "p95_ms": 1478.0,
+      "p50_ms": 13.0,
+      "p95_ms": 1147.0,
       "n": 112
     },
     "report": {
-      "p50_ms": 1285.01537500415,
-      "p95_ms": 11427.862583077513,
+      "p50_ms": 1224.2145839845762,
+      "p95_ms": 10352.982249925844,
       "n": 3
     },
     "note": "Single-user timings with the mock LLM on the machine that ran the report, so they exclude model time; the load test (load/locustfile.py) has not been run against a deployed stack."
@@ -101,6 +101,6 @@
     "Injection planted inside filings: covered by the sanitiser unit tests (DP-004), not this rate, which asks the injections as questions.",
     "Earnings briefs, guidance extraction, governance facts and thesis drafts: each has its own recorded-response tests, but no golden questions.",
     "Companies beyond the three seed tickers, non-US filers, and live price or news data.",
-    "Latency under concurrent load or with a real model: these are single-user timings on the machine that ran the report."
+    "Latency under concurrent load: these are single-user timings on the machine that ran the report."
   ]
 }

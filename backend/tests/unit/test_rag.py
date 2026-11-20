@@ -21,6 +21,7 @@ from app.rag.injection import (
     wrap_untrusted,
 )
 from app.rag.intent import classify_intent
+from app.rag.pipeline import _is_metric_trend
 from app.rag.rerank import IdentityReranker, LexicalReranker
 from app.rag.rewrite import rewrite_query
 from app.rag.tools import ToolBudgetExceeded, ToolLoopDetected, ToolRunner
@@ -90,6 +91,25 @@ def test_rewrite_expands_synonyms() -> None:
         "what is the gross margin", intent=Intent.FINANCIAL_METRIC, available_fiscal_years=_YEARS
     )
     assert "gross profit percentage" in r.expanded
+
+
+def test_rewrite_maps_capital_spending_to_the_filings_wording() -> None:  # RAG-003
+    # Filings say "capital expenditures"; the golden question says "capital spending".
+    r = rewrite_query(
+        "How did management characterize NVIDIA's capital spending?",
+        intent=Intent.MANAGEMENT_COMMENTARY,
+        available_fiscal_years=_YEARS,
+    )
+    assert "capital expenditures" in r.expanded
+
+
+def test_recent_years_series_goes_to_stored_figures() -> None:  # RAG-030
+    # "over recent fiscal years" was not read as a trend, so the series went to document search
+    # and the live model found no income statement among the passages.
+    q = "Show NVIDIA's net income over recent fiscal years."
+    r = rewrite_query(q, intent=Intent.DOCUMENT_SUMMARY, available_fiscal_years=_YEARS)
+    assert r.is_over_time is True
+    assert _is_metric_trend(q, r) is True
 
 
 def test_rewrite_resolves_last_three_years() -> None:

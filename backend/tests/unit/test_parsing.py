@@ -228,6 +228,22 @@ def test_tables_leave_no_markup_behind() -> None:  # DP-001
     assert all("<" not in b.text for b in blocks)
 
 
+def test_table_takes_its_unit_from_the_line_above() -> None:  # CH-003, CIT-005
+    # Apple prints "(In millions, ...)" above its statements, not inside them, so the caption had no
+    # unit and the verifier read "112,010" as dollars, rejecting a correct "$112,010 million".
+    html = (
+        "<html><body><p>CONSOLIDATED STATEMENTS OF OPERATIONS</p>"
+        "<p>(In millions, except per-share amounts)</p>"
+        "<table><tr><td></td><td>2025</td><td>2024</td></tr>"
+        "<tr><td>Net income</td><td>112,010</td><td>93,736</td></tr></table>"
+        "<table><tr><td>Basic</td><td>7.49</td></tr></table>"
+        "</body></html>"
+    )
+    tables = [b.table for b in linearize(clean_tree(html)) if b.table is not None]
+    assert tables[0].caption == "Financial table, 2024-2025, in millions"
+    assert tables[1].caption == "Financial table"  # no text between: nothing to inherit
+
+
 def test_inline_tagged_figures_stay_in_their_sentence() -> None:  # DP-001, FR-FN-001
     # Inline XBRL wraps each figure in its own element; breaking lines at every element turned
     # "were $95.2 billion" into three lines, and in the notes each line became its own chunk.

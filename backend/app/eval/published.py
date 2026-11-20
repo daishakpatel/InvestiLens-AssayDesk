@@ -17,7 +17,6 @@ import math
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +25,7 @@ from sqlalchemy.orm import Session
 from app.citation.evidence import EvidenceItem
 from app.citation.extract import extract_numbers
 from app.citation.resolver import resolve_source
-from app.citation.verify import number_matches
+from app.citation.verify import number_matches, source_values
 
 _Z95 = 1.959963984540054
 _MARKER = re.compile(r"\[(\d+)\]")
@@ -150,14 +149,7 @@ def check_answer(
             total += 1
             if item is not None and all(q in item.searchable_text() for q in quotes):
                 valid += 1
-        candidates: list[Decimal] = []
-        for item in items:
-            if item is None:
-                continue
-            candidates.extend(item.structured_values())
-            candidates.extend(
-                t.value for t in extract_numbers(item.searchable_text()) if t.value is not None
-            )
+        candidates = [v for item in items if item is not None for v in source_values(item)]
         for token in extract_numbers(text):
             if token.kind == "date":
                 continue

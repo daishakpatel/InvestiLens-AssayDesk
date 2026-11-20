@@ -67,12 +67,19 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       `gemini-embedding-2` over the three fixture companies). Hit@5 100% (45/45), MRR 0.8148,
       citation validity 100%, number match 97.2% (211/217), correct abstention 100%, injection
       resistance 100%, **false abstention 13.4% (11/82)**; report p50 61 s; whole run $0.64,
-      itemised by purpose in the report. Judge faithfulness is still not measured (`FakeJudge`). `[code]`
-- [ ] **Live model declines 11 of 82 answerable questions** (mock: 0): Apple profitability
-      factors, Apple customer concentration, capital spending ×3 (NVDA/AAPL/JPM), JPM product
-      demand, NVDA and AAPL net income series, NVDA revenue vs net income growth, and two more.
-      The net income series are structured-metric questions the mock run answers, so check those
-      first; the qualitative ones point at `rag_sufficiency_min_score` (tuned to mock scores). `[code]`
+      itemised by purpose in the report. Judge faithfulness is still not measured (`FakeJudge`).
+      After the fixes in "Done" (2026-11-19): false abstention 8.5% (7/82), number match 99.3%,
+      MRR 0.8135 (n=42), report p50 59 s, $0.62 a run. `[code]`
+- [ ] **Live model declines 7 of 82 answerable questions** (was 11 on 2026-11-19; reproduced over
+      two runs). Every one passed retrieval sufficiency, so `rag_sufficiency_min_score` is not the
+      cause: the model itself says the passages don't answer. Left: capital spending ×3 (only
+      NVIDIA's 10-K says "capital expenditures"; Apple's and JPMorgan's don't discuss it), Apple
+      profitability factors, NVIDIA revenue vs net income growth (two metrics, one lexicon hit),
+      and JPMorgan gross-margin questions (a bank has none; the golden label may be wrong). `[code]`
+- [ ] **Dev DB table captions predate the unit fix**: tables now take "(In millions)" from the
+      line above (2026-11-19), but stored chunks keep the old caption until their filings are
+      re-parsed, so the dev app still rejects some correct "$X million" figures from NVIDIA/Apple
+      tables. `PARSER_VERSION` was not bumped (that re-parses everything and drops note summaries). `[code]`
   - [ ] Judge calibration ≥ 0.85 against a 50-question human-labelled sample (none committed). `[notes]`
   - [ ] Re-tune `rag_sufficiency_min_score`, entailment and confidence thresholds on real
         embeddings; decide reranker (ADR-0014) and entailment verifier (ADR-0015). `[notes]`
@@ -301,6 +308,14 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       not-found. Current reports (23–27) are clean. Delete or regenerate the old ones. `[code]`
 
 ## Done since the audit
+
+- 2026-11-19 — **Live false abstentions 13.4% → 8.5%**, from three fixes found by probing each
+  declined question: (1) tables take their unit from the line above ("(In millions, …)"), so the
+  verifier stops rejecting Apple's correct "$112,010 million"; (2) "over recent fiscal years" is a
+  trend, so a metric series is answered from stored figures (RAG-030) instead of passages;
+  (3) "capital spending" expands to "capital expenditures". The published number check now reads
+  tables at their stated unit through the verifier's own `source_values`, which it lacked: all 17
+  "mismatches" in the first fixed run were correct figures from "in millions" tables.
 
 - 2026-11-18 — **Deterministic retrieval order**: tied scores (duplicate passages give equal
   cosine distances; `ts_rank_cd` ties are common) came back in on-disk order, which differs between

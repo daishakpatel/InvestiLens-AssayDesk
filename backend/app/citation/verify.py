@@ -59,16 +59,21 @@ def _number_supported(token: NumberToken, cited: Sequence[EvidenceItem], *, rel_
     """
     if token.kind == "date":
         return any(token.raw in item.searchable_text() for item in cited)
-    candidates: list[Decimal] = []
-    for item in cited:
-        candidates.extend(item.structured_values())
-        text = item.searchable_text()
-        tokens = [t for t in extract_numbers(text) if t.value is not None]
-        candidates.extend(t.value for t in tokens if t.value is not None)
-        # A table "(in millions)" holds 19,827 for a claim's "$19,827 million" or "$19.8 billion".
-        for scale in {_TABLE_SCALES[m.group(1).lower()] for m in _TABLE_SCALE.finditer(text)}:
-            candidates.extend(t.value * scale for t in tokens if t.value and t.kind != "percent")
+    candidates = [value for item in cited for value in source_values(item)]
     return number_matches(token, candidates, rel_tol=rel_tol)
+
+
+def source_values(item: EvidenceItem) -> list[Decimal]:
+    """Every number a source states: its structured values and the figures in its text, with a
+    table's figures also at its stated unit. Shared with the published eval check (NFR-ME-002)."""
+    values = list(item.structured_values())
+    text = item.searchable_text()
+    tokens = [t for t in extract_numbers(text) if t.value is not None]
+    values.extend(t.value for t in tokens if t.value is not None)
+    # A table "(in millions)" holds 19,827 for a claim's "$19,827 million" or "$19.8 billion".
+    for scale in {_TABLE_SCALES[m.group(1).lower()] for m in _TABLE_SCALE.finditer(text)}:
+        values.extend(t.value * scale for t in tokens if t.value and t.kind != "percent")
+    return values
 
 
 def _accept(

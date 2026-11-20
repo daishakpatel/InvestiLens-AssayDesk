@@ -1,6 +1,6 @@
 # Evaluation report
 
-Generated 2026-11-20T03:35:37+00:00 from `15a2e9d689fe64cbc6cbbf04c4e107689bce9bb9` (uncommitted changes) by `make eval-report`.
+Generated 2026-11-20T04:35:24+00:00 from `f6c34b3bb459693d61141e6094f653cf5b3eb8d3` (uncommitted changes) by `make eval-report`.
 
 - **LLM:** live (gemini-3.8-flash)
 - **Dataset:** golden_v0, 106 cases + 11 injection inputs
@@ -9,20 +9,20 @@ Generated 2026-11-20T03:35:37+00:00 from `15a2e9d689fe64cbc6cbbf04c4e107689bce9b
 
 | Metric | Value | Wilson 95% interval | Count |
 |---|---|---|---|
-| citation_validity | 100.0% | 98.8% to 100.0% | 314/314 |
-| number_match | 97.2% | 94.1% to 98.7% | 211/217 |
+| citation_validity | 100.0% | 98.9% to 100.0% | 344/344 |
+| number_match | 99.3% | 97.5% to 99.8% | 289/291 |
 | correct_abstention | 100.0% | 86.2% to 100.0% | 24/24 |
-| false_abstention | 13.4% | 7.7% to 22.4% | 11/82 |
-| retrieval_hit_at_5 | 100.0% | 92.1% to 100.0% | 45/45 |
-| retrieval_mrr | 0.8148 | — | n=45 |
+| false_abstention | 8.5% | 4.2% to 16.6% | 7/82 |
+| retrieval_hit_at_5 | 100.0% | 91.6% to 100.0% | 42/42 |
+| retrieval_mrr | 0.8135 | — | n=42 |
 | injection_resistance | 100.0% | 74.1% to 100.0% | 11/11 |
 
 ## Latency
 
 | Path | p50 | p95 | n |
 |---|---|---|---|
-| chat answer (first token = full verified turn) | 16 ms | 6989 ms | 112 |
-| report generation | 60518 ms | 71579 ms | 3 |
+| chat answer (first token = full verified turn) | 16 ms | 7457 ms | 112 |
+| report generation | 58856 ms | 65869 ms | 3 |
 
 Single-user timings with the live model on the machine that ran the report.
 
@@ -32,14 +32,14 @@ Whole run, including embedding the fixtures, from `llm_calls`.
 
 | Purpose | Calls | USD |
 |---|---|---|
-| chat | 111 | 0.2595 |
-| earnings_brief | 1 | 0.0034 |
+| chat | 111 | 0.2331 |
+| earnings_brief | 1 | 0.0035 |
 | embedding | 32 | 0.1200 |
 | governance_facts | 1 | 0.0042 |
 | guidance_extract | 1 | 0.0033 |
-| note_summary | 8 | 0.0302 |
-| report_section | 36 | 0.2204 |
-| **total** | | **0.6410** |
+| note_summary | 8 | 0.0310 |
+| report_section | 36 | 0.2219 |
+| **total** | | **0.6170** |
 
 ## Definitions
 

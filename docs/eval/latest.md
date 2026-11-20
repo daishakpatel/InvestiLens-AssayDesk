@@ -1,6 +1,6 @@
 # Evaluation report
 
-Generated 2026-11-19T03:19:50+00:00 from `15a2e9d689fe64cbc6cbbf04c4e107689bce9bb9` (uncommitted changes) by `make eval-report`.
+Generated 2026-11-20T04:37:54+00:00 from `f6c34b3bb459693d61141e6094f653cf5b3eb8d3` (uncommitted changes) by `make eval-report`.
 
 - **LLM:** mock (FakeLLM (deterministic))
 - **Dataset:** golden_v0, 106 cases + 11 injection inputs
@@ -9,20 +9,20 @@ Generated 2026-11-19T03:19:50+00:00 from `15a2e9d689fe64cbc6cbbf04c4e107689bce9b
 
 | Metric | Value | Wilson 95% interval | Count |
 |---|---|---|---|
-| citation_validity | 100.0% | 96.1% to 100.0% | 94/94 |
-| number_match | 100.0% | 92.7% to 100.0% | 49/49 |
+| citation_validity | 100.0% | 96.5% to 100.0% | 106/106 |
+| number_match | 100.0% | 94.3% to 100.0% | 64/64 |
 | correct_abstention | 100.0% | 86.2% to 100.0% | 24/24 |
 | false_abstention | 0.0% | 0.0% to 4.5% | 0/82 |
-| retrieval_hit_at_5 | 100.0% | 92.1% to 100.0% | 45/45 |
-| retrieval_mrr | 0.7544 | — | n=45 |
+| retrieval_hit_at_5 | 100.0% | 91.6% to 100.0% | 42/42 |
+| retrieval_mrr | 0.7488 | — | n=42 |
 | injection_resistance | 100.0% | 74.1% to 100.0% | 11/11 |
 
 ## Latency
 
 | Path | p50 | p95 | n |
 |---|---|---|---|
-| chat answer (first token = full verified turn) | 10 ms | 1478 ms | 112 |
-| report generation | 1285 ms | 11428 ms | 3 |
+| chat answer (first token = full verified turn) | 13 ms | 1147 ms | 112 |
+| report generation | 1224 ms | 10353 ms | 3 |
 
 Single-user timings with the mock LLM on the machine that ran the report, so they exclude model time; the load test (load/locustfile.py) has not been run against a deployed stack.
 
@@ -43,4 +43,4 @@ Single-user timings with the mock LLM on the machine that ran the report, so the
 - Injection planted inside filings: covered by the sanitiser unit tests (DP-004), not this rate, which asks the injections as questions.
 - Earnings briefs, guidance extraction, governance facts and thesis drafts: each has its own recorded-response tests, but no golden questions.
 - Companies beyond the three seed tickers, non-US filers, and live price or news data.
-- Latency under concurrent load or with a real model: these are single-user timings on the machine that ran the report.
+- Latency under concurrent load: these are single-user timings on the machine that ran the report.
