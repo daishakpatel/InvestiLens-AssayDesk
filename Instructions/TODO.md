@@ -76,10 +76,13 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       NVIDIA's 10-K says "capital expenditures"; Apple's and JPMorgan's don't discuss it), Apple
       profitability factors, NVIDIA revenue vs net income growth (two metrics, one lexicon hit),
       and JPMorgan gross-margin questions (a bank has none; the golden label may be wrong). `[code]`
-- [ ] **Dev DB table captions predate the unit fix**: tables now take "(In millions)" from the
-      line above (2026-11-19), but stored chunks keep the old caption until their filings are
-      re-parsed, so the dev app still rejects some correct "$X million" figures from NVIDIA/Apple
-      tables. `PARSER_VERSION` was not bumped (that re-parses everything and drops note summaries). `[code]`
+- [ ] **Dev DB: 468 re-captioned table chunks are not embedded** (2026-11-20). The 67 documents
+      whose tables gain a unit from the line above (dry run over every stored filing: AAPL 25,
+      NVDA 26, AMD 8, JPM 5, INTC 3) were re-parsed by clearing `parser_version` (no version bump),
+      after a backup (`backups/assay-desk-20261120T160008Z.dump`). Chunk ids are unchanged in every
+      one, and the 8 cached note summaries the re-parse drops were restored. Embedding the 468
+      changed 10-K/10-Q table chunks failed with Gemini HTTP 402 (credit exhausted), so until
+      `scripts/embed_chunks.py` is re-run they are found by keyword search only. `[code]`
   - [ ] Judge calibration ≥ 0.85 against a 50-question human-labelled sample (none committed). `[notes]`
   - [ ] Re-tune `rag_sufficiency_min_score`, entailment and confidence thresholds on real
         embeddings; decide reranker (ADR-0014) and entailment verifier (ADR-0015). `[notes]`
