@@ -63,16 +63,22 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 - [x] Mock-run numbers with Wilson intervals are published and gated → 37 (`make eval-report`,
       `docs/eval/latest.md`, `thresholds.json`).
-- [ ] **Publish live-model numbers**: Recall@5 with real embeddings, judge faithfulness, cost
-      and latency per report/chat. `EVAL_LIVE=1 make eval-report OUT=live` exists and is
-      untried; about 106 questions, roughly $1–2. `[code]`
+- [x] **Publish live-model numbers**: done 2026-11-19, `docs/eval/live.md` (`gemini-3.8-flash`,
+      `gemini-embedding-2` over the three fixture companies). Hit@5 100% (45/45), MRR 0.8148,
+      citation validity 100%, number match 97.2% (211/217), correct abstention 100%, injection
+      resistance 100%, **false abstention 13.4% (11/82)**; report p50 61 s; whole run $0.64,
+      itemised by purpose in the report. Judge faithfulness is still not measured (`FakeJudge`). `[code]`
+- [ ] **Live model declines 11 of 82 answerable questions** (mock: 0): Apple profitability
+      factors, Apple customer concentration, capital spending ×3 (NVDA/AAPL/JPM), JPM product
+      demand, NVDA and AAPL net income series, NVDA revenue vs net income growth, and two more.
+      The net income series are structured-metric questions the mock run answers, so check those
+      first; the qualitative ones point at `rag_sufficiency_min_score` (tuned to mock scores). `[code]`
   - [ ] Judge calibration ≥ 0.85 against a 50-question human-labelled sample (none committed). `[notes]`
   - [ ] Re-tune `rag_sufficiency_min_score`, entailment and confidence thresholds on real
         embeddings; decide reranker (ADR-0014) and entailment verifier (ADR-0015). `[notes]`
-- [ ] **`retrieval_mrr` in the published eval is not deterministic** (found 2026-11-17): identical
-      mock runs gave 0.7933, 0.7822, 0.7711 with no code change; the other six metrics are stable
-      and mock embeddings are SHA-256-based, so tied retrieval scores are likely ordered without a
-      tie-break. The 2026-11-15 note that blamed commit 262ddb2 for an MRR shift was wrong. `[code]`
+- [x] **`retrieval_mrr` in the published eval is not deterministic** (found 2026-11-17): fixed
+      2026-11-18, see "Done". The 2026-11-15 note that blamed commit 262ddb2 for an MRR shift was
+      wrong. `[code]`
 - [ ] **Load test never run**: every row of the NFR table in `docs/testing.md` says `_not yet run_`. `[code]`
 
 ### Data
@@ -296,6 +302,13 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ## Done since the audit
 
+- 2026-11-18 — **Deterministic retrieval order**: tied scores (duplicate passages give equal
+  cosine distances; `ts_rank_cd` ties are common) came back in on-disk order, which differs between
+  database builds, so mock eval MRR moved between 0.7711 and 0.7933 with no code change. Ties now
+  break by chunk id: in SQL for keyword search, and in Python after the query for vector search
+  (an extra SQL sort key stops Postgres using the HNSW index). Golden-set rankings are identical
+  across fresh seeds and the published MRR is now a stable 0.7544. A tie exactly at the
+  candidate limit can still pick either row.
 - 2026-11-11 — **Report feedback** (ADR-0060): `POST /feedback/report` stores a reader's thumbs
   up/down (and optional reason) on a report or one claim in `report_feedback`, replacing their
   earlier rating. The report page shows "Was this report useful?" to signed-in readers; the chat

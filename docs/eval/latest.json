@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-18T01:24:07+00:00",
-  "git_sha": "5a41442cd5d2105abf44f1b3e95be6590a60ab66",
+  "generated_at": "2026-11-19T03:19:50+00:00",
+  "git_sha": "15a2e9d689fe64cbc6cbbf04c4e107689bce9bb9",
   "dirty": true,
-  "inputs_hash": "fc7f95a3afd4762ed98c5c2baad74a8566a4ed7256db7f1dac00df41bed1c04d",
+  "inputs_hash": "4d0342abebee993e40d5d2686c742b4806d76e10656826e401b59cf525cbbdc8",
   "llm": {
     "mode": "mock",
     "model": "FakeLLM (deterministic)"
@@ -69,7 +69,7 @@
       ]
     },
     "retrieval_mrr": {
-      "value": 0.7711,
+      "value": 0.7544,
       "n": 45
     },
     "injection_resistance": {
@@ -84,13 +84,13 @@
   },
   "latency": {
     "chat": {
-      "p50_ms": 11.0,
-      "p95_ms": 1219.0,
+      "p50_ms": 10.0,
+      "p95_ms": 1478.0,
       "n": 112
     },
     "report": {
-      "p50_ms": 3012.4434999888763,
-      "p95_ms": 12473.854084033519,
+      "p50_ms": 1285.01537500415,
+      "p95_ms": 11427.862583077513,
       "n": 3
     },
     "note": "Single-user timings with the mock LLM on the machine that ran the report, so they exclude model time; the load test (load/locustfile.py) has not been run against a deployed stack."

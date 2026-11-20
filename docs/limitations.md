@@ -71,7 +71,9 @@ The open-work list behind it is [`Instructions/TODO.md`](../Instructions/TODO.md
   metric lookup does not map that phrase to the stored `eps_diluted` values.
 - **Mock-run limits.** The published numbers come from a deterministic fake model and hash
   embeddings, so they measure retrieval plumbing, verification and abstention, not writing
-  quality or semantic search. No live-model eval has been published.
+  quality or semantic search. A live run (`docs/eval/live.md`, 2026-11-19, Gemini model and
+  embeddings) kept citation validity at 100% and number match at 97.2%, but declined 11 of 82
+  answerable questions (13.4%, against 0% in the mock run). No model judge scored it.
 - **Narrow demo answers.** The public demo replays recorded answers only. A question nobody
   recorded gets the honest "not enough evidence" reply.
 
@@ -104,7 +106,7 @@ line when it is fixed.
 
 | Issue | Status | Area |
 |---|---|---|
-| Live-model eval (Recall@5, judge faithfulness, cost) not published | Open: needs a paid run | [21 — evaluation](../Instructions/21_phase5b_evaluation_framework.md) |
+| Live model declines 13.4% of answerable questions; judge faithfulness not measured | Open: live numbers in `docs/eval/live.md` | [21 — evaluation](../Instructions/21_phase5b_evaluation_framework.md) |
 | Load test never run against a deployed stack | Open | [22 — observability](../Instructions/22_phase5c_observability_and_security.md) |
 | Public demo not yet deployed | Open: ready, needs the owner's Render account | [37 — this phase](../Instructions/37_phase7l_measured_results_and_polish.md) |
 | No email delivery for verification and password reset | Open | [17 — auth](../Instructions/17_phase4b_auth_and_users.md) |

@@ -129,6 +129,40 @@ def test_vector_search_orders_by_cosine(session: Session, seeded: Company) -> No
     assert scores == sorted(scores, reverse=True)  # descending similarity
 
 
+def test_tied_search_scores_are_ordered_by_chunk_id(session: Session, seeded: Company) -> None:
+    # RAG-010: duplicate passages score identically; their order must not depend on where the rows
+    # sit on disk, or eval rankings (and MRR) change from one database build to the next.
+    doc_id = _chunks(session, seeded.id)[0].document_id
+    text = "Forward-looking statements involve risks and uncertainties."
+    vec = [float(x) for x in asyncio.run(MockEmbeddingClient().embed([text]))[0]]
+    top = session.scalar(select(func.max(DocumentChunk.id))) or 0
+    ids = [top + 1001, top + 1002, top + 1003]
+    # Stored highest id first, vectors set on insert (an embedding UPDATE would rewrite the rows
+    # in id order), so the physical order is the reverse of id order.
+    for i, cid in enumerate(reversed(ids)):
+        session.add(
+            DocumentChunk(
+                id=cid,
+                document_id=doc_id,
+                company_id=seeded.id,
+                chunk_index=10 + i,
+                chunk_type="text",
+                text=text,
+                section="Item 1A",
+                parser_version="doc-parse-v1",
+                embedding=vec,
+                embedding_model=MOCK_MODEL,
+                embedding_dim=len(vec),
+            )
+        )
+        session.flush()
+
+    hits = vector_search_by_vector(session, vector=vec, company_id=seeded.id, limit=3)
+    assert [h.chunk_id for h in hits] == ids
+    words = keyword_search(session, query="forward-looking risks", company_id=seeded.id)
+    assert [h.chunk_id for h in words] == ids
+
+
 def test_vector_search_ignores_vectors_from_another_model(
     session: Session, seeded: Company
 ) -> None:

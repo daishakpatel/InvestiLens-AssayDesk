@@ -177,6 +177,21 @@ def _markdown(report: dict[str, Any]) -> str:
         "",
         f"{report['latency']['note']}",
         "",
+    ]
+    if "cost" in report:
+        cost = report["cost"]
+        lines += [
+            "## Cost",
+            "",
+            "Whole run, including embedding the fixtures, from `llm_calls`.",
+            "",
+            "| Purpose | Calls | USD |",
+            "|---|---|---|",
+            *[f"| {p} | {c['calls']} | {c['usd']} |" for p, c in cost["by_purpose"].items()],
+            f"| **total** | | **{cost['total_usd']}** |",
+            "",
+        ]
+    lines += [
         "## Definitions",
         "",
         *[f"- **{k}:** {v}" for k, v in DEFINITIONS.items()],
@@ -189,18 +204,41 @@ def _markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-_NOT_COVERED = [
+def _costs() -> dict[str, Any]:
+    """Model and embedding spend by purpose, read from `llm_calls` in the eval database."""
+    from sqlalchemy import func, select
+
+    from app.db import session_scope
+    from app.models import LlmCall
+
+    with session_scope() as session:
+        rows = session.execute(
+            select(LlmCall.purpose, func.count(), func.coalesce(func.sum(LlmCall.cost_usd), 0))
+            .group_by(LlmCall.purpose)
+            .order_by(LlmCall.purpose)
+        ).all()
+    by_purpose = {str(p): {"calls": n, "usd": str(usd)} for p, n, usd in rows}
+    return {"by_purpose": by_purpose, "total_usd": str(sum(usd for _p, _n, usd in rows))}
+
+
+_MOCK_ONLY = [
     "Writing quality and faithfulness of a real model: the mock run uses a deterministic fake "
     "that quotes its evidence, so it measures retrieval, verification and abstention only.",
     "Retrieval quality with real embeddings: mock embeddings are hashes, so hit@5 and MRR here "
     "are plumbing checks, not semantic quality (ADR-0010, ADR-0020).",
+]
+_LIVE_ONLY = [
+    "Judge faithfulness: no model judge scored these answers and no human-labelled sample "
+    "calibrates one, so a cited sentence that misreads its source is not caught here.",
+]
+_NOT_COVERED = [
     "Injection planted inside filings: covered by the sanitiser unit tests (DP-004), not this "
     "rate, which asks the injections as questions.",
     "Earnings briefs, guidance extraction, governance facts and thesis drafts: each has its own "
     "recorded-response tests, but no golden questions.",
     "Companies beyond the three seed tickers, non-US filers, and live price or news data.",
-    "Latency under concurrent load or with a real model: these are single-user timings on the "
-    "machine that ran the report.",
+    "Latency under concurrent load: these are single-user timings on the machine that ran the "
+    "report.",
 ]
 
 
@@ -260,8 +298,10 @@ def main() -> int:
                 else "Single-user timings with the live model on the machine that ran the report."
             ),
         },
-        "not_covered": _NOT_COVERED,
+        "not_covered": (_LIVE_ONLY if live else _MOCK_ONLY) + _NOT_COVERED,
     }
+    if live:
+        report["cost"] = _costs()
 
     out = _ROOT / "docs" / "eval"
     out.mkdir(parents=True, exist_ok=True)

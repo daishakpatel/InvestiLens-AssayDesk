@@ -1,0 +1,138 @@
+{
+  "generated_at": "2026-11-20T03:35:37+00:00",
+  "git_sha": "15a2e9d689fe64cbc6cbbf04c4e107689bce9bb9",
+  "dirty": true,
+  "inputs_hash": "4d0342abebee993e40d5d2686c742b4806d76e10656826e401b59cf525cbbdc8",
+  "llm": {
+    "mode": "live",
+    "model": "gemini-3.8-flash"
+  },
+  "prompt_versions": {
+    "chat_synthesis": "chat_synth@8a38c682",
+    "report": "report_v3",
+    "judge": "judge_v1"
+  },
+  "dataset": {
+    "version": "golden_v0",
+    "path": "backend/tests/eval/golden_v0.jsonl"
+  },
+  "companies": [
+    "NVDA",
+    "AAPL",
+    "JPM"
+  ],
+  "n_cases": 106,
+  "metrics": {
+    "citation_validity": {
+      "value": 1.0,
+      "successes": 314,
+      "n": 314,
+      "ci95": [
+        0.9879,
+        1.0
+      ]
+    },
+    "number_match": {
+      "value": 0.9724,
+      "successes": 211,
+      "n": 217,
+      "ci95": [
+        0.941,
+        0.9873
+      ]
+    },
+    "correct_abstention": {
+      "value": 1.0,
+      "successes": 24,
+      "n": 24,
+      "ci95": [
+        0.862,
+        1.0
+      ]
+    },
+    "false_abstention": {
+      "value": 0.1341,
+      "successes": 11,
+      "n": 82,
+      "ci95": [
+        0.0766,
+        0.2245
+      ]
+    },
+    "retrieval_hit_at_5": {
+      "value": 1.0,
+      "successes": 45,
+      "n": 45,
+      "ci95": [
+        0.9213,
+        1.0
+      ]
+    },
+    "retrieval_mrr": {
+      "value": 0.8148,
+      "n": 45
+    },
+    "injection_resistance": {
+      "value": 1.0,
+      "successes": 11,
+      "n": 11,
+      "ci95": [
+        0.7412,
+        1.0
+      ]
+    }
+  },
+  "latency": {
+    "chat": {
+      "p50_ms": 16.0,
+      "p95_ms": 6989.0,
+      "n": 112
+    },
+    "report": {
+      "p50_ms": 60518.25008401647,
+      "p95_ms": 71579.14675003849,
+      "n": 3
+    },
+    "note": "Single-user timings with the live model on the machine that ran the report."
+  },
+  "not_covered": [
+    "Judge faithfulness: no model judge scored these answers and no human-labelled sample calibrates one, so a cited sentence that misreads its source is not caught here.",
+    "Injection planted inside filings: covered by the sanitiser unit tests (DP-004), not this rate, which asks the injections as questions.",
+    "Earnings briefs, guidance extraction, governance facts and thesis drafts: each has its own recorded-response tests, but no golden questions.",
+    "Companies beyond the three seed tickers, non-US filers, and live price or news data.",
+    "Latency under concurrent load: these are single-user timings on the machine that ran the report."
+  ],
+  "cost": {
+    "by_purpose": {
+      "chat": {
+        "calls": 111,
+        "usd": "0.2595"
+      },
+      "earnings_brief": {
+        "calls": 1,
+        "usd": "0.0034"
+      },
+      "embedding": {
+        "calls": 32,
+        "usd": "0.1200"
+      },
+      "governance_facts": {
+        "calls": 1,
+        "usd": "0.0042"
+      },
+      "guidance_extract": {
+        "calls": 1,
+        "usd": "0.0033"
+      },
+      "note_summary": {
+        "calls": 8,
+        "usd": "0.0302"
+      },
+      "report_section": {
+        "calls": 36,
+        "usd": "0.2204"
+      }
+    },
+    "total_usd": "0.6410"
+  }
+}

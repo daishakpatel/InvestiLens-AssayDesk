@@ -148,7 +148,8 @@ re-running the verifier being measured. `docs/eval/thresholds.json` holds the fl
 when the report's `inputs_hash` no longer matches the chat, citation, retrieval, prompt, eval
 and golden-set files it measured. The hash is over content, not commits, so a report committed
 alongside its code stays fresh. `EVAL_LIVE=1 make eval-report OUT=live` is the manual live-model
-run.
+run: it writes `docs/eval/live.{json,md}` with the same metrics plus the run's cost by purpose
+from `llm_calls`, and is not gated.
 
 ### Docs consistency (Phase 7l, NFR-ME-011)
 

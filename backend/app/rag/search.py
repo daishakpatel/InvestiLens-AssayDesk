@@ -113,6 +113,10 @@ def vector_search_by_vector(
         .order_by(distance)
         .limit(limit)
     ).all()
+    # Equal distances (duplicate passages) come back in heap order, which differs between
+    # databases; break ties by id here, since a second SQL sort key stops the HNSW index being used.
+    # shortcut: a tie straddling `limit` can still pick either row; fetch past it if that matters.
+    rows = sorted(rows, key=lambda r: (r.distance, r.id))
     return [SearchHit(cid, 1.0 - float(dist), txt, section) for cid, dist, txt, section in rows]
 
 
@@ -145,7 +149,7 @@ def keyword_search(
                 DocumentChunk.tsv.op("@@")(tsquery),
                 *filters,
             )
-            .order_by(rank.desc())
+            .order_by(rank.desc(), DocumentChunk.id)  # id: ts_rank ties are common
             .limit(limit)
         ).all()
         if rows:
