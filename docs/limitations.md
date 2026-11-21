@@ -8,7 +8,7 @@ The open-work list behind it is [`Instructions/TODO.md`](../Instructions/TODO.md
 
 - Financial statements come from SEC EDGAR XBRL company facts. A company that tags a line item
   with a custom or missing concept gets no value for it, shown as "not available" with a reason
-  code, never 0. AMD's pretax income and AMD's and Intel's quarterly D&A are examples.
+  code, never 0. AMD's and Intel's total liabilities (so their Altman Z) are an example.
 - Filings arrive when ingestion runs. Locally that means by hand. The scheduled poller (every 10
   minutes) and the 02:00 ET daily pipeline exist but have never run on a deployed stack.
 - Prices are end-of-day only (Tiingo), refreshed after the US close and when the API starts.
@@ -71,9 +71,9 @@ The open-work list behind it is [`Instructions/TODO.md`](../Instructions/TODO.md
   metric lookup does not map that phrase to the stored `eps_diluted` values.
 - **Mock-run limits.** The published numbers come from a deterministic fake model and hash
   embeddings, so they measure retrieval plumbing, verification and abstention, not writing
-  quality or semantic search. A live run (`docs/eval/live.md`, 2026-11-19, Gemini model and
-  embeddings) kept citation validity at 100% and number match at 99.3%, but declined 7 of 82
-  answerable questions (8.5%, against 0% in the mock run). No model judge scored it.
+  quality or semantic search. A live run (`docs/eval/live.md`, 2026-11-20, Gemini model and
+  embeddings) kept citation validity at 100% and number match at 99.3%, but declined 7 of 80
+  answerable questions (8.8%, against 0% in the mock run). No model judge scored it.
 - **Narrow demo answers.** The public demo replays recorded answers only. A question nobody
   recorded gets the honest "not enough evidence" reply.
 

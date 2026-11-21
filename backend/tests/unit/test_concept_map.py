@@ -77,6 +77,13 @@ def test_jpm_override_marks_bank_and_resolves_revenue() -> None:
     assert cmap.tags("revenue")[0] == "us-gaap:Revenues"
 
 
+def test_amd_pretax_income_uses_its_statement_line_first() -> None:
+    """AMD's 10-Qs tag pretax income only with the equity-method variant (FR-QT-010)."""
+    tags = load_concept_map(ticker="AMD").tags("pretax_income")
+    assert tags[0].endswith("MinorityInterestAndIncomeLossFromEquityMethodInvestments")
+    assert load_concept_map(ticker="NVDA").tags("pretax_income") == tags[1:]
+
+
 # --- DR-021: NVIDIA non-calendar fiscal year end (DoD #3) ----------------------------
 def test_nvidia_fiscal_year_end_is_last_sunday_of_january() -> None:
     facts = _facts("NVDA")

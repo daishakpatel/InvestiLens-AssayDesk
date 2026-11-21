@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-20T04:37:54+00:00",
-  "git_sha": "f6c34b3bb459693d61141e6094f653cf5b3eb8d3",
+  "generated_at": "2026-11-20T18:17:39+00:00",
+  "git_sha": "5c937b08365d1f5f0f7d5fe515abbc88ae9f6352",
   "dirty": true,
-  "inputs_hash": "a045d4b954c4639484b227903e5959122e9de82e082d0782f8cdb0aa70112057",
+  "inputs_hash": "9635e5e69f609f94f548e29e7503bf9f7f7c3c8d8c4bf6122fd638b1cdc634d5",
   "llm": {
     "mode": "mock",
     "model": "FakeLLM (deterministic)"
@@ -25,10 +25,10 @@
   "metrics": {
     "citation_validity": {
       "value": 1.0,
-      "successes": 106,
-      "n": 106,
+      "successes": 104,
+      "n": 104,
       "ci95": [
-        0.965,
+        0.9644,
         1.0
       ]
     },
@@ -43,34 +43,34 @@
     },
     "correct_abstention": {
       "value": 1.0,
-      "successes": 24,
-      "n": 24,
+      "successes": 26,
+      "n": 26,
       "ci95": [
-        0.862,
+        0.8713,
         1.0
       ]
     },
     "false_abstention": {
       "value": 0.0,
       "successes": 0,
-      "n": 82,
+      "n": 80,
       "ci95": [
         0.0,
-        0.0448
+        0.0458
       ]
     },
     "retrieval_hit_at_5": {
       "value": 1.0,
-      "successes": 42,
-      "n": 42,
+      "successes": 40,
+      "n": 40,
       "ci95": [
-        0.9162,
+        0.9124,
         1.0
       ]
     },
     "retrieval_mrr": {
-      "value": 0.7488,
-      "n": 42
+      "value": 0.7362,
+      "n": 40
     },
     "injection_resistance": {
       "value": 1.0,
@@ -84,13 +84,13 @@
   },
   "latency": {
     "chat": {
-      "p50_ms": 13.0,
-      "p95_ms": 1147.0,
+      "p50_ms": 11.0,
+      "p95_ms": 1405.0,
       "n": 112
     },
     "report": {
-      "p50_ms": 1224.2145839845762,
-      "p95_ms": 10352.982249925844,
+      "p50_ms": 1404.8927500844002,
+      "p95_ms": 13850.064125028439,
       "n": 3
     },
     "note": "Single-user timings with the mock LLM on the machine that ran the report, so they exclude model time; the load test (load/locustfile.py) has not been run against a deployed stack."

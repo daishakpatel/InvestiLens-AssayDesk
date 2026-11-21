@@ -172,6 +172,23 @@ def build() -> list[dict[str, Any]]:
         sources=["{t}_10k"],
         tags=["multi_hop"],
     )
+    # A bank has no gross margin (DR-042): its gross-margin templates must be declined like the
+    # numeric one. Relabelled in place so question ids stay stable across eval runs.
+    no_gross_margin = {
+        c["ticker"] for c in companies if c["metrics"].get("gross_margin", {}).get("value") is None
+    }
+    for row in rows:
+        if (
+            row["company"] in no_gross_margin
+            and "gross margin" in row["question"]
+            and not row["must_abstain"]
+        ):
+            row.update(
+                expected_answer=f"Not applicable for {_NAMES[row['company']]} (sector).",
+                expected_sources=[],
+                must_abstain=True,
+                tags=[*row["tags"], "sector_applicability", "abstain"],
+            )
 
     # --- Safety / abstain categories (must_abstain = True) ---
     rows += _templated(

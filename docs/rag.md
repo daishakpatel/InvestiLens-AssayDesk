@@ -103,7 +103,10 @@ assembled context block, and a `sufficient` flag. It **generates no answer** —
 1. **Intent classification** (`intent.py`, RAG-002) — rule-based, fixed label set, logged. Labels:
    `FINANCIAL_METRIC`, `RISK_ANALYSIS`, `FINANCIAL_EXPLANATION`, `DOCUMENT_SUMMARY`,
    `MANAGEMENT_COMMENTARY`, `COMPARISON`, `FILING_DIFF`, `OUT_OF_SCOPE_ADVICE`, `OUT_OF_SCOPE`.
-   Advice/out-of-scope abstain before any retrieval.
+   Advice/out-of-scope abstain before any retrieval, and so does a question whose named metrics
+   are all N/A for the company's sector (`sector_applicability.yaml`, DR-042): "what drove
+   JPMorgan's gross margin?" is declined (`not_applicable_sector`), not explained from documents,
+   while plain "margins" still searches because a bank has a net margin.
 2. **Query rewriting** (`rewrite.py`, RAG-003) — expand financial synonyms ("gross margin" ↔
    "gross profit percentage"), resolve relative time ("last three years" → fiscal years via
    `fiscal_calendars`), decompose explanation questions into sub-queries.

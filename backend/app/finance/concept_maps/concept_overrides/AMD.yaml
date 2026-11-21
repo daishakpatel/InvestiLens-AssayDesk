@@ -20,3 +20,10 @@ flow_metrics:
     - us-gaap:DepreciationDepletionAndAmortization
     - us-gaap:DepreciationAndAmortization
     - composite:depreciation_amortization
+  # AMD's income statement line is "Income before income taxes and equity income" (tagged with the
+  # equity-method variant in every 10-Q and 10-K); the default tag appears only in its 10-K tax
+  # note, so quarters were never mapped. The statement line comes first so every period shares one
+  # basis; it is also the denominator of AMD's own effective tax rate (FY2025 4,140M vs 4,166M).
+  pretax_income:
+    - us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments
+    - us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest

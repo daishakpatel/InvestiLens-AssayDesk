@@ -297,6 +297,16 @@ def test_insufficient_evidence_abstains(session: Session, corpus: Company) -> No
     assert result.abstain_reason == "insufficient_evidence"
 
 
+def test_sector_inapplicable_metric_abstains(session: Session, corpus: Company) -> None:  # DR-042
+    corpus.sector = "Banks"
+    session.flush()
+    why = run_retrieval(session, question="What drove the change in gross margin?", ticker="TST")
+    assert why.sufficient is False and why.abstain_reason == "not_applicable_sector"
+    # Plain "margins" includes net margin, which a bank has, so it still searches.
+    margins = run_retrieval(session, question="What did management say on margins?", ticker="TST")
+    assert margins.abstain_reason != "not_applicable_sector"
+
+
 def test_advice_question_abstains_before_retrieval(
     session: Session, corpus: Company, monkeypatch: pytest.MonkeyPatch
 ) -> None:

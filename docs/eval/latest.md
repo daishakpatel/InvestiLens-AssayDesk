@@ -1,6 +1,6 @@
 # Evaluation report
 
-Generated 2026-11-20T04:37:54+00:00 from `f6c34b3bb459693d61141e6094f653cf5b3eb8d3` (uncommitted changes) by `make eval-report`.
+Generated 2026-11-20T18:17:39+00:00 from `5c937b08365d1f5f0f7d5fe515abbc88ae9f6352` (uncommitted changes) by `make eval-report`.
 
 - **LLM:** mock (FakeLLM (deterministic))
 - **Dataset:** golden_v0, 106 cases + 11 injection inputs
@@ -9,20 +9,20 @@ Generated 2026-11-20T04:37:54+00:00 from `f6c34b3bb459693d61141e6094f653cf5b3eb8
 
 | Metric | Value | Wilson 95% interval | Count |
 |---|---|---|---|
-| citation_validity | 100.0% | 96.5% to 100.0% | 106/106 |
+| citation_validity | 100.0% | 96.4% to 100.0% | 104/104 |
 | number_match | 100.0% | 94.3% to 100.0% | 64/64 |
-| correct_abstention | 100.0% | 86.2% to 100.0% | 24/24 |
-| false_abstention | 0.0% | 0.0% to 4.5% | 0/82 |
-| retrieval_hit_at_5 | 100.0% | 91.6% to 100.0% | 42/42 |
-| retrieval_mrr | 0.7488 | — | n=42 |
+| correct_abstention | 100.0% | 87.1% to 100.0% | 26/26 |
+| false_abstention | 0.0% | 0.0% to 4.6% | 0/80 |
+| retrieval_hit_at_5 | 100.0% | 91.2% to 100.0% | 40/40 |
+| retrieval_mrr | 0.7362 | — | n=40 |
 | injection_resistance | 100.0% | 74.1% to 100.0% | 11/11 |
 
 ## Latency
 
 | Path | p50 | p95 | n |
 |---|---|---|---|
-| chat answer (first token = full verified turn) | 13 ms | 1147 ms | 112 |
-| report generation | 1224 ms | 10353 ms | 3 |
+| chat answer (first token = full verified turn) | 11 ms | 1405 ms | 112 |
+| report generation | 1405 ms | 13850 ms | 3 |
 
 Single-user timings with the mock LLM on the machine that ran the report, so they exclude model time; the load test (load/locustfile.py) has not been run against a deployed stack.
 

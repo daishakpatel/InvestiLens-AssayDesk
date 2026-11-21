@@ -70,19 +70,22 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       itemised by purpose in the report. Judge faithfulness is still not measured (`FakeJudge`).
       After the fixes in "Done" (2026-11-19): false abstention 8.5% (7/82), number match 99.3%,
       MRR 0.8135 (n=42), report p50 59 s, $0.62 a run. `[code]`
-- [ ] **Live model declines 7 of 82 answerable questions** (was 11 on 2026-11-19; reproduced over
-      two runs). Every one passed retrieval sufficiency, so `rag_sufficiency_min_score` is not the
-      cause: the model itself says the passages don't answer. Left: capital spending ×3 (only
-      NVIDIA's 10-K says "capital expenditures"; Apple's and JPMorgan's don't discuss it), Apple
-      profitability factors, NVIDIA revenue vs net income growth (two metrics, one lexicon hit),
-      and JPMorgan gross-margin questions (a bank has none; the golden label may be wrong). `[code]`
-- [ ] **Dev DB: 468 re-captioned table chunks are not embedded** (2026-11-20). The 67 documents
+- [ ] **Live model declines 7 of 80 answerable questions** (2026-11-20, two live runs, $0.60
+      each; `docs/eval/live.md` is the second). JPMorgan's gross-margin "why" and "compare"
+      questions are now declined by the pipeline and labelled must-abstain (ADR-0065), so the pool
+      is 80/26. Left: capital spending ×3 (only NVIDIA's 10-K says "capital expenditures";
+      Apple's and JPMorgan's don't discuss it, so those labels may be wrong too), Apple
+      profitability factors, and "did revenue grow faster than net income?" for NVIDIA and Apple:
+      only revenue has a stored `yoy_growth`, so the model has no deterministic net-income growth
+      to compare (needs a stored per-metric growth, a design call). One run also declined
+      JPMorgan "demand for products"; citation validity was 98.1% on the first run and 100% on the
+      second, so single-question swings are run-to-run variance. `[code]`
+- [x] **Dev DB: 468 re-captioned table chunks are not embedded**: embedded 2026-11-20 after the
+      credit top-up (4 batches, $0.034), so they are found by vector search again. The 67 documents
       whose tables gain a unit from the line above (dry run over every stored filing: AAPL 25,
       NVDA 26, AMD 8, JPM 5, INTC 3) were re-parsed by clearing `parser_version` (no version bump),
       after a backup (`backups/assay-desk-20261120T160008Z.dump`). Chunk ids are unchanged in every
-      one, and the 8 cached note summaries the re-parse drops were restored. Embedding the 468
-      changed 10-K/10-Q table chunks failed with Gemini HTTP 402 (credit exhausted), so until
-      `scripts/embed_chunks.py` is re-run they are found by keyword search only. `[code]`
+      one, and the 8 cached note summaries the re-parse drops were restored. `[code]`
   - [ ] Judge calibration ≥ 0.85 against a 50-question human-labelled sample (none committed). `[notes]`
   - [ ] Re-tune `rag_sufficiency_min_score`, entailment and confidence thresholds on real
         embeddings; decide reranker (ADR-0014) and entailment verifier (ADR-0015). `[notes]`
@@ -98,9 +101,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       (header, report, portfolio, peers, earnings, thesis KPIs) use TTM as filed by the price date
       (e.g. NVDA P/E 20.35 on TTM to 2026-07-26). Fiscal-year rows use that year's figures, which
       are the TTM at the year end; only `/compare` reads them, by design. `[code]`
-- [ ] **AMD pretax income and AMD/Intel D&A are not mapped quarterly**: their tags are missing
-      from the concept map, so `metric_gaps` lists them and their TTM effective tax rate, ROIC
-      and EBITDA are absent (checked 2026-10-21 on the dev DB). `[code]`
+- [x] **AMD pretax income and AMD/Intel D&A are not mapped quarterly**: D&A was fixed by the
+      Phase 7h composites (ADR-0046). Pretax income fixed 2026-11-20: AMD's statement line is
+      the equity-method variant tag, now first in `concept_overrides/AMD.yaml`, so its quarters,
+      TTM tax rate (FY2024 19.2%), ROIC and EBITDA build; AMD has no pretax gaps left. `[code]`
 - [ ] **AMD and Intel have no total liabilities tag** (Phase 7d): their Altman Z is
       `insufficient_data` (missing `total_liabilities`), and so are their balance-sheet accruals.
       Deriving it as assets − equity was rejected because of temporary equity (ADR-0042). Altman's

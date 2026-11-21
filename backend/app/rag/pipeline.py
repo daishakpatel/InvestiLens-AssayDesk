@@ -15,6 +15,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+from app.finance.concept_map import load_concept_map
 from app.models import Company
 from app.observability.metrics import record_retrieval_score
 from app.observability.tracing import span
@@ -219,6 +220,23 @@ def _run_retrieval(
                 evidence=[],
                 sufficient=False,
                 abstain_reason="unknown_company",
+            ),
+            0.0,
+        )
+
+    # DR-042: a metric N/A for the sector (a bank's gross margin) is declined, never explained
+    # from documents. Plain "margins" still applies to a bank through net margin.
+    named = _extract_metrics(question)
+    cmap = load_concept_map(ticker=company.ticker, cik=company.cik, sector=company.sector)
+    if named and not any(cmap.applies(m) for m in named):
+        return _log(
+            RetrievalResult(
+                question=question,
+                intent=intent,
+                rewritten=empty_rewrite,
+                evidence=[],
+                sufficient=False,
+                abstain_reason="not_applicable_sector",
             ),
             0.0,
         )
