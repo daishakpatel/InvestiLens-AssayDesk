@@ -157,8 +157,10 @@ the frontend as a typed client (`frontend/src/services/api.d.ts`).
 Chat requires an authenticated user (ADR-0006: no anonymous AI). Phase 3c resolves the user from an
 `X-User-Id` header as an interim seam; Phase 4b replaces it with JWT verification without changing
 call sites. The answer is retrieval-routed (structured metrics vs documents), citation-verified
-(Phase 3a), and returns `evidence_label`, `abstained`/`refused`, `tool_trace`, `suggested_questions`,
-and `message_id` (for feedback).
+(Phase 3a), and returns `evidence_label`, `abstained`/`refused`, `not_applicable` (abstained because
+the metric doesn't apply to the company's sector, e.g. a bank's gross margin; ADR-0065), `tool_trace`,
+`suggested_questions`, and `message_id` (for feedback). The stream's `done` frame carries the same
+flags.
 
 ### Auth (Phase 4b — implemented, ADR-0005/0006)
 | Method | Path | Notes |

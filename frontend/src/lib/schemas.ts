@@ -582,6 +582,7 @@ const chatResponse = z.object({
   evidence_label: evidenceLabel.nullish(),
   abstained: z.boolean(),
   refused: z.boolean(),
+  not_applicable: z.boolean().default(false),
   tool_trace: z.array(z.object({ tool: z.string(), latency_ms: z.number().nullish() })).default([]),
   suggested_questions: z.array(z.string()).default([]),
   session_id: z.string().nullish(),

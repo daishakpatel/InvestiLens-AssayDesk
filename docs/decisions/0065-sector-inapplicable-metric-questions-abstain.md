@@ -26,6 +26,7 @@ Thresholds are unchanged.
 ## Consequences
 
 Bank gross-margin questions are declined consistently in every phrasing, and the eval no longer
-rewards an answer that DR-042 forbids. The decline message is still the generic "couldn't find
-evidence" one; a sector-specific message ("gross margin does not apply to banks") would be
-friendlier and is the natural follow-up. Rates published before 2026-11-20 used the 82/24 split.
+rewards an answer that DR-042 forbids. The decline says why, not "couldn't find evidence": the
+chat turn (`ChatResponse` and the stream's `done` frame) gains an additive `not_applicable` flag,
+the answer reads "Gross margin doesn't apply to JPM: banks don't report it.", and
+the assistant titles it "Doesn't apply". Rates published before 2026-11-20 used the 82/24 split.

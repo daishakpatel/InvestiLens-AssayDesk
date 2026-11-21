@@ -1855,6 +1855,11 @@ export interface components {
             /** Message Id */
             message_id?: string | null;
             /**
+             * Not Applicable
+             * @default false
+             */
+            not_applicable: boolean;
+            /**
              * Refused
              * @default false
              */

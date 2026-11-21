@@ -24,11 +24,17 @@ function suggestedQuestions(ticker: string): string[] {
 }
 
 /** A decision not to answer, shown as what it is: deliberate, and not an error (§14, LGL-006). */
-function Declined({ kind, text }: { kind: "abstained" | "refused"; text: string }) {
+const DECLINED_TITLE = {
+  abstained: "Not enough evidence to answer",
+  notApplicable: "Doesn't apply",
+  refused: "Outside what Assay Desk covers",
+};
+
+function Declined({ kind, text }: { kind: keyof typeof DECLINED_TITLE; text: string }) {
   return (
     <div className="rounded-control border border-border px-3 py-2.5">
       <p className="text-label font-medium text-text">
-        {kind === "abstained" ? "Not enough evidence to answer" : "Outside what Assay Desk covers"}
+        {DECLINED_TITLE[kind]}
       </p>
       <p className="mt-1 text-sm text-muted">{text}</p>
     </div>
@@ -45,7 +51,13 @@ function Answer({
   onAsk: (question: string) => void;
 }) {
   const waiting = !message.done && message.text === "";
-  const declined = message.refused ? "refused" : message.abstained ? "abstained" : null;
+  const declined = message.refused
+    ? "refused"
+    : message.notApplicable
+      ? "notApplicable"
+      : message.abstained
+        ? "abstained"
+        : null;
   const references = message.citations.map((c) => ({
     number: c.number,
     sourceId: c.source_id,

@@ -32,6 +32,7 @@ async def sse_events(turn: ChatTurn) -> AsyncIterator[bytes]:
             "evidence_label": turn.evidence_label,
             "abstained": turn.abstained,
             "refused": turn.refused,
+            "not_applicable": turn.not_applicable,
             "session_id": turn.session_id,
             "message_id": turn.message_id,
             "suggested_questions": turn.suggested_questions,

@@ -11,6 +11,7 @@ export interface AssistantMessage {
   done: boolean;
   abstained?: boolean;
   refused?: boolean;
+  notApplicable?: boolean;
   evidenceLabel?: EvidenceLabel | null;
   toolTrace?: ToolTraceEntry[];
   suggested?: string[];
@@ -76,6 +77,7 @@ export function useConversation(ticker: string): Conversation {
               done: true,
               abstained: meta.abstained,
               refused: meta.refused,
+              notApplicable: meta.not_applicable,
               evidenceLabel: meta.evidence_label,
               toolTrace: meta.tool_trace,
               suggested: meta.suggested_questions,

@@ -41,6 +41,7 @@ def _to_response(turn: ChatTurn) -> ChatResponse:
         evidence_label=turn.evidence_label,
         abstained=turn.abstained,
         refused=turn.refused,
+        not_applicable=turn.not_applicable,
         tool_trace=turn.tool_trace,
         suggested_questions=turn.suggested_questions,
         session_id=str(turn.session_id) if turn.session_id is not None else None,

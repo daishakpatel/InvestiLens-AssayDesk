@@ -10,6 +10,8 @@ export interface ChatDoneMeta {
   evidence_label: EvidenceLabel | null;
   abstained: boolean;
   refused: boolean;
+  /** Abstained because the metric doesn't apply to the company's sector (DR-042). */
+  not_applicable: boolean;
   session_id: string | number | null;
   message_id: string | number | null;
   suggested_questions: string[];

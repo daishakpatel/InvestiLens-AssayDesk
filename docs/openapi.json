@@ -679,6 +679,11 @@
             ],
             "title": "Message Id"
           },
+          "not_applicable": {
+            "default": false,
+            "title": "Not Applicable",
+            "type": "boolean"
+          },
           "refused": {
             "default": false,
             "title": "Refused",

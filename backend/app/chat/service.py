@@ -24,7 +24,9 @@ from app.citation.evidence import EvidenceItem
 from app.citation.pipeline import verify_text
 from app.citation.resolver import resolve_source
 from app.config import Settings, get_settings
+from app.finance.concept_map import load_concept_map
 from app.ingestion.documents.tokens import estimate_tokens
+from app.models import Company
 from app.observability.tracing import span as otel_span
 from app.providers import get_llm_client
 from app.providers.base import LLMClient, LLMMessage
@@ -75,10 +77,28 @@ class ChatTurn:
     evidence_label: EvidenceLabel | None = None
     abstained: bool = False
     refused: bool = False
+    not_applicable: bool = False  # declined: the metric doesn't apply to the sector
     tool_trace: list[ToolTraceEntry] = field(default_factory=list)
     suggested_questions: list[str] = field(default_factory=list)
     session_id: int | None = None
     message_id: int | None = None
+
+
+_SECTOR_PLURAL = {"bank": "banks", "reit": "REITs"}
+
+
+def _not_applicable_message(company: Company, metrics: tuple[str, ...]) -> str | None:
+    """'Gross margin doesn't apply to JPM: banks don't report it.' (DR-042). Ticker, not the SEC
+    name, which is upper case ("JPMORGAN CHASE & CO")."""
+    if not metrics:
+        return None
+    sector = load_concept_map(ticker=company.ticker, cik=company.cik, sector=company.sector).sector
+    names = " and ".join(m.replace("_", " ") for m in metrics)
+    verb, it = ("doesn't", "it") if len(metrics) == 1 else ("don't", "them")
+    who = _SECTOR_PLURAL.get(sector, f"{sector} companies")
+    return (
+        f"{names[0].upper()}{names[1:]} {verb} apply to {company.ticker}: {who} don't report {it}."
+    )
 
 
 def _is_followup(question: str) -> bool:
@@ -252,10 +272,11 @@ def _answer_question(
 
     evidence = _evidence_set(session, result)
     if not result.sufficient or not evidence:
-        return _finish(
+        not_applicable = _not_applicable_message(company_row, result.not_applicable)
+        turn = _finish(
             session,
             chat_session.id,
-            "I couldn't find evidence in the ingested sources to answer that.",
+            not_applicable or "I couldn't find evidence in the ingested sources to answer that.",
             [],
             None,
             abstained=True,
@@ -268,6 +289,8 @@ def _answer_question(
             tokens=(0, None),
             model=settings.llm_model_cheap,
         )
+        turn.not_applicable = not_applicable is not None
+        return turn
 
     # Metric questions answer deterministically from structured data (RAG-030, FR-027); qualitative
     # questions are synthesized by the LLM. Both are then citation-verified (Phase 3a).

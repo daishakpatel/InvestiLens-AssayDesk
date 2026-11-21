@@ -45,6 +45,7 @@ class ChatResponse(BaseModel):
     evidence_label: EvidenceLabel | None = None
     abstained: bool = False
     refused: bool = False  # out-of-scope / advice refusal (distinct from abstention)
+    not_applicable: bool = False  # abstained: the metric doesn't apply to the sector (DR-042)
     tool_trace: list[ToolTraceEntry] = []
     suggested_questions: list[str] = []
     session_id: str | None = None

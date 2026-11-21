@@ -338,6 +338,24 @@ def test_abstention_on_no_evidence(session: Session, seed: tuple[int, Company]) 
     )
     assert turn.abstained and turn.citations == []
     assert "couldn't find evidence" in turn.answer
+    assert not turn.not_applicable
+
+
+def test_sector_inapplicable_metric_says_it_does_not_apply(  # DR-042
+    session: Session, seed: tuple[int, Company]
+) -> None:
+    user_id, company = seed
+    company.sector = "Banks"
+    session.flush()
+    turn = answer_question(
+        session,
+        company="TST",
+        question="What drove the change in gross margin?",
+        user_id=user_id,
+        llm=FakeLLM(),
+    )
+    assert turn.abstained and turn.not_applicable and turn.citations == []
+    assert turn.answer == "Gross margin doesn't apply to TST: banks don't report it."
 
 
 # --- DoD: prompt-injection against full chat does not change behavior ---

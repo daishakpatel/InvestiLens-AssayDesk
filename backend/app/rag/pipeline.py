@@ -237,6 +237,7 @@ def _run_retrieval(
                 evidence=[],
                 sufficient=False,
                 abstain_reason="not_applicable_sector",
+                not_applicable=named,
             ),
             0.0,
         )
