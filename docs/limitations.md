@@ -71,9 +71,9 @@ The open-work list behind it is [`Instructions/TODO.md`](../Instructions/TODO.md
   metric lookup does not map that phrase to the stored `eps_diluted` values.
 - **Mock-run limits.** The published numbers come from a deterministic fake model and hash
   embeddings, so they measure retrieval plumbing, verification and abstention, not writing
-  quality or semantic search. A live run (`docs/eval/live.md`, 2026-11-20, Gemini model and
-  embeddings) kept citation validity at 100% and number match at 99.3%, but declined 7 of 80
-  answerable questions (8.8%, against 0% in the mock run). No model judge scored it.
+  quality or semantic search. A live run (`docs/eval/live.md`, 2026-11-21, Gemini model and
+  embeddings) kept citation validity at 100% and number match at 99.3%, and declined 2 of 78
+  answerable questions (2.6%, against 0% in the mock run). No model judge scored it.
 - **Narrow demo answers.** The public demo replays recorded answers only. A question nobody
   recorded gets the honest "not enough evidence" reply.
 

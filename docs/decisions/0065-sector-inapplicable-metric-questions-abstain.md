@@ -30,3 +30,10 @@ rewards an answer that DR-042 forbids. The decline says why, not "couldn't find 
 chat turn (`ChatResponse` and the stream's `done` frame) gains an additive `not_applicable` flag,
 the answer reads "Gross margin doesn't apply to JPM: banks don't report it.", and
 the assistant titles it "Doesn't apply". Rates published before 2026-11-20 used the 82/24 split.
+
+**Amended 2026-11-21.** The metric lexicon gains capex ("capex", "capital spending/expenditures"),
+which a bank also lacks, so JPMorgan's capital-spending question is declined the same way. The
+generator now decides applicability from `sector_applicability.yaml` itself (not the golden
+metrics), and also relabels Apple's "how did management characterize capital spending?" as
+must-abstain: checked against the fixtures, Apple's filings show capex only as a cash-flow table
+line and never discuss it (NVIDIA's 10-Q does, so its question stays answerable). Pools: 78/28.

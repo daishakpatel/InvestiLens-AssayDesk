@@ -61,7 +61,7 @@ from app.schemas.sources import (
     XbrlFactSource,
 )
 
-_REVENUE_GROWTH = re.compile(r"derived:([^:]+):revenue_(yoy|cagr):FY(\d{4})-FY(\d{4})")
+_METRIC_GROWTH = re.compile(r"derived:([^:]+):([a-z_]+?)_(yoy|cagr):FY(\d{4})-FY(\d{4})")
 _DATED_VALUATION = re.compile(r"derived:([^:]+):([a-z_]+):(\d{4}-\d{2}-\d{2})")
 _NUMERIC_SCALE = Decimal("0.00000001")  # financial_metrics.metric_value is NUMERIC(28, 8)
 
@@ -195,9 +195,9 @@ def resolve_source(session: Session, source_id: str) -> SourceDetail | None:
     )
     if metric is not None:
         return _metric(metric)
-    growth = _REVENUE_GROWTH.fullmatch(source_id)
+    growth = _METRIC_GROWTH.fullmatch(source_id)
     if growth:
-        return _revenue_growth(session, source_id, growth)
+        return _metric_growth(session, source_id, growth)
     dated = _DATED_VALUATION.fullmatch(source_id)
     if dated and dated[2] in VALUATION_METRICS:
         return _valuation_on(session, source_id, dated)
@@ -246,9 +246,10 @@ def _valuation_on(session: Session, source_id: str, match: re.Match[str]) -> Sou
     )
 
 
-def _revenue_growth(session: Session, source_id: str, match: re.Match[str]) -> SourceDetail | None:
-    """A report's growth figure, recomputed from the two revenue rows its ID names (ADR-0055)."""
-    ticker, kind, start, end = match[1], match[2], int(match[3]), int(match[4])
+def _metric_growth(session: Session, source_id: str, match: re.Match[str]) -> SourceDetail | None:
+    """A growth figure, recomputed from the two stored FY rows its ID names (ADR-0055, ADR-0066)."""
+    ticker, metric, kind = match[1], match[2], match[3]
+    start, end = int(match[4]), int(match[5])
     rows = {
         row.fiscal_year: row
         for row in session.scalars(
@@ -256,7 +257,7 @@ def _revenue_growth(session: Session, source_id: str, match: re.Match[str]) -> S
             .join(Company, Company.id == FinancialMetric.company_id)
             .where(
                 Company.ticker == ticker,
-                FinancialMetric.metric_name == "revenue",
+                FinancialMetric.metric_name == metric,
                 FinancialMetric.period_type == "FY",
                 FinancialMetric.is_latest.is_(True),
                 FinancialMetric.fiscal_year.in_([start, end]),
@@ -273,10 +274,12 @@ def _revenue_growth(session: Session, source_id: str, match: re.Match[str]) -> S
     )
     if result.value is None:
         return None
+    # Revenue keeps "yoy_growth"/"cagr" (reads "Revenue growth"); others read "Net income growth".
+    suffix = "growth" if kind == "yoy" else "cagr"
     return _metric(
         FinancialMetric(  # never added to the session: this figure is computed, not stored
             source_id=source_id,
-            metric_name=result.formula_id,
+            metric_name=result.formula_id if metric == "revenue" else f"{metric}_{suffix}",
             period=f"FY{end}",
             metric_value=result.value,
             unit=result.unit,
@@ -285,7 +288,7 @@ def _revenue_growth(session: Session, source_id: str, match: re.Match[str]) -> S
             quality_flags={
                 "formula_version": result.formula_version,
                 "inputs": [
-                    {"name": "revenue", "period": row.period, "source_id": row.source_id}
+                    {"name": metric, "period": row.period, "source_id": row.source_id}
                     for row in (first, last)
                 ],
             },

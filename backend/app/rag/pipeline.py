@@ -44,6 +44,7 @@ _METRIC_LEXICON: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     (re.compile(r"\boperating income\b", re.I), ("operating_income",)),
     (re.compile(r"\b(free cash flow|fcf)\b", re.I), ("free_cash_flow",)),
     (re.compile(r"\bebitda\b", re.I), ("ebitda",)),
+    (re.compile(r"\b(capex|capital (expenditures?|spending))\b", re.I), ("capex",)),
     # Before net income, which "earnings" in "earnings per share" would otherwise match.
     (re.compile(r"\b((diluted )?eps|(diluted )?earnings per share)\b", re.I), ("eps_diluted",)),
     (re.compile(r"\b(net income|earnings|profit)\b", re.I), ("net_income",)),
@@ -67,6 +68,45 @@ def _is_metric_trend(question: str, rewritten: RewrittenQuery) -> bool:
         and bool(_extract_metrics(question))
         and not _WHY.search(question)
     )
+
+
+_GROWTH_WORD = re.compile(r"\b(gr[eo]w\w*|growth)\b", re.I)
+
+
+def _all_metrics(question: str) -> list[str]:
+    """Every metric a question names, in the question's order. A matched phrase is consumed, so
+    "gross margin" is not also read as plain "margins", nor "earnings per share" as "earnings"."""
+    found: list[tuple[int, str]] = []
+    for pattern, names in _METRIC_LEXICON:
+        match = pattern.search(question)
+        if match:
+            question = pattern.sub(lambda m: " " * len(m[0]), question)  # keeps positions
+            found += [(match.start(), n) for n in names if n not in {f for _, f in found}]
+    return [name for _, name in sorted(found)]
+
+
+def _growth_answer(
+    session: Session, *, ticker: str, metrics: list[str], end: int
+) -> tuple[list[str], list[str], list[dict[str, object]]]:
+    """Each metric's growth into FY`end`, from the finance layer, cited by its growth ID."""
+    runner = ToolRunner(session, max_calls=len(metrics))
+    blocks: list[str] = []
+    source_ids: list[str] = []
+    for name in metrics:
+        result = runner.call(
+            "calculate_growth",
+            ticker=ticker,
+            metric=name,
+            period_1=f"FY{end - 1}",
+            period_2=f"FY{end}",
+        )
+        if result.get("value") is not None:
+            sid = f"derived:{ticker}:{name}_yoy:FY{end - 1}-FY{end}"  # resolver recomputes it
+            blocks.append(
+                f"[metric] {name} growth FY{end} = {result['value']} ratio (source_id={sid})"
+            )
+            source_ids.append(sid)
+    return blocks, source_ids, [{"tool": c.name, "latency_ms": c.latency_ms} for c in runner.log]
 
 
 def _extract_metrics(question: str) -> tuple[str, ...]:
@@ -248,6 +288,31 @@ def _run_retrieval(
     # A stock-price question is answered from stored daily bars (ADR-0054).
     if is_price_question(question):
         return _log(*_price_answer(session, company, question, rewritten))
+
+    # "Did revenue grow faster than net income?": two or more stored flows' growth, compared from
+    # structured data, never from documents or model arithmetic (RAG-030, ADR-0066).
+    growing = [m for m in _all_metrics(question) if not m.endswith("_margin")]
+    if (
+        len(growing) > 1
+        and fiscal_years
+        and _GROWTH_WORD.search(question)
+        and not _WHY.search(question)
+    ):
+        end = (rewritten.fiscal_years or sorted(fiscal_years))[-1]
+        blocks, source_ids, trace = _growth_answer(session, ticker=ticker, metrics=growing, end=end)
+        assembled = assemble_context(intent=intent, evidence=[], structured_blocks=blocks)
+        result = RetrievalResult(
+            question=question,
+            intent=intent,
+            rewritten=rewritten,
+            evidence=[],
+            structured_source_ids=source_ids,
+            assembled_context=assembled.context_block,
+            sufficient=bool(source_ids),
+            abstain_reason=None if source_ids else "no_structured_metric",
+            tool_trace=trace,
+        )
+        return _log(result, 1.0 if source_ids else 0.0)
 
     # RAG-030: a pure metric lookup, or a stored metric's trend over several years, is answered
     # from structured data, never via document search.

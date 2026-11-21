@@ -1,6 +1,6 @@
 # Evaluation report
 
-Generated 2026-11-20T23:22:43+00:00 from `5c937b08365d1f5f0f7d5fe515abbc88ae9f6352` (uncommitted changes) by `make eval-report`.
+Generated 2026-11-21T23:11:30+00:00 from `82ef4bdb93f0a05cf7ec6aefb6b3011a2884b707` (uncommitted changes) by `make eval-report`.
 
 - **LLM:** live (gemini-3.8-flash)
 - **Dataset:** golden_v0, 106 cases + 11 injection inputs
@@ -9,20 +9,20 @@ Generated 2026-11-20T23:22:43+00:00 from `5c937b08365d1f5f0f7d5fe515abbc88ae9f63
 
 | Metric | Value | Wilson 95% interval | Count |
 |---|---|---|---|
-| citation_validity | 100.0% | 98.9% to 100.0% | 334/334 |
-| number_match | 99.3% | 97.4% to 99.8% | 273/275 |
-| correct_abstention | 100.0% | 87.1% to 100.0% | 26/26 |
-| false_abstention | 8.8% | 4.3% to 17.0% | 7/80 |
-| retrieval_hit_at_5 | 100.0% | 91.2% to 100.0% | 40/40 |
-| retrieval_mrr | 0.8167 | — | n=40 |
+| citation_validity | 100.0% | 98.9% to 100.0% | 338/338 |
+| number_match | 99.3% | 97.4% to 99.8% | 276/278 |
+| correct_abstention | 100.0% | 87.9% to 100.0% | 28/28 |
+| false_abstention | 2.6% | 0.7% to 8.9% | 2/78 |
+| retrieval_hit_at_5 | 100.0% | 90.1% to 100.0% | 35/35 |
+| retrieval_mrr | 0.7905 | — | n=35 |
 | injection_resistance | 100.0% | 74.1% to 100.0% | 11/11 |
 
 ## Latency
 
 | Path | p50 | p95 | n |
 |---|---|---|---|
-| chat answer (first token = full verified turn) | 10 ms | 7482 ms | 112 |
-| report generation | 59991 ms | 67255 ms | 3 |
+| chat answer (first token = full verified turn) | 10 ms | 7027 ms | 112 |
+| report generation | 58922 ms | 64152 ms | 3 |
 
 Single-user timings with the live model on the machine that ran the report.
 
@@ -32,14 +32,14 @@ Whole run, including embedding the fixtures, from `llm_calls`.
 
 | Purpose | Calls | USD |
 |---|---|---|
-| chat | 111 | 0.2185 |
-| earnings_brief | 1 | 0.0033 |
+| chat | 111 | 0.1894 |
+| earnings_brief | 1 | 0.0032 |
 | embedding | 32 | 0.1200 |
 | governance_facts | 1 | 0.0044 |
-| guidance_extract | 1 | 0.0033 |
-| note_summary | 8 | 0.0300 |
-| report_section | 36 | 0.2199 |
-| **total** | | **0.5994** |
+| guidance_extract | 1 | 0.0034 |
+| note_summary | 8 | 0.0304 |
+| report_section | 36 | 0.2248 |
+| **total** | | **0.5756** |
 
 ## Definitions
 

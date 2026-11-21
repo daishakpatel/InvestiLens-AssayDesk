@@ -70,16 +70,14 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       itemised by purpose in the report. Judge faithfulness is still not measured (`FakeJudge`).
       After the fixes in "Done" (2026-11-19): false abstention 8.5% (7/82), number match 99.3%,
       MRR 0.8135 (n=42), report p50 59 s, $0.62 a run. `[code]`
-- [ ] **Live model declines 7 of 80 answerable questions** (2026-11-20, two live runs, $0.60
-      each; `docs/eval/live.md` is the second). JPMorgan's gross-margin "why" and "compare"
-      questions are now declined by the pipeline and labelled must-abstain (ADR-0065), so the pool
-      is 80/26. Left: capital spending ×3 (only NVIDIA's 10-K says "capital expenditures";
-      Apple's and JPMorgan's don't discuss it, so those labels may be wrong too), Apple
-      profitability factors, and "did revenue grow faster than net income?" for NVIDIA and Apple:
-      only revenue has a stored `yoy_growth`, so the model has no deterministic net-income growth
-      to compare (needs a stored per-metric growth, a design call). One run also declined
-      JPMorgan "demand for products"; citation validity was 98.1% on the first run and 100% on the
-      second, so single-question swings are run-to-run variance. `[code]`
+- [ ] **Live model declines 2 of 78 answerable questions** (2026-11-21, `docs/eval/live.md`, $0.58;
+      was 7/80 on 2026-11-20). Fixed: "did revenue grow faster than net income?" is answered from
+      stored growth (ADR-0066); JPMorgan's capital spending is declined as N/A for a bank, and
+      Apple's relabelled must-abstain since its filings never discuss it (ADR-0065 amendment).
+      Left: NVIDIA capital spending (its 10-Q's commitments note describes capex, so the passage
+      exists; check whether management-commentary scope reaches 10-Q notes) and JPMorgan "demand
+      for products" (declined in two runs in a row). Apple profitability, declined before, was
+      answered this run. `[code]`
 - [x] **Dev DB: 468 re-captioned table chunks are not embedded**: embedded 2026-11-20 after the
       credit top-up (4 batches, $0.034), so they are found by vector search again. The 67 documents
       whose tables gain a unit from the line above (dry run over every stored filing: AAPL 25,

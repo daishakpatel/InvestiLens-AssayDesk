@@ -14,14 +14,26 @@ judged by `must_abstain`, not intent equality (see app/eval and ADR-0020).
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 _ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_ROOT / "backend"))
+
+from app.finance.concept_map import load_concept_map  # noqa: E402
+
 _FIXTURES = _ROOT / "backend" / "tests" / "fixtures"
 _OUT = _ROOT / "backend" / "tests" / "eval" / "golden_v0.jsonl"
 
 _NAMES = {"NVDA": "NVIDIA", "AAPL": "Apple", "JPM": "JPMorgan"}
+
+# Metrics a qualitative template names, checked against sector_applicability.yaml.
+_TEMPLATE_METRICS = {"gross margin": "gross_margin", "capital spending": "capex"}
+# Checked against the fixture filings: Apple's 10-K/10-Q show capex only as a cash-flow table line
+# ("Payments for acquisition of property, plant and equipment") and its 8-K not at all, so
+# management never characterizes it. (NVIDIA's 10-Q does, so its question stays answerable.)
+_NO_DISCLOSURE = {("AAPL", "How did management characterize Apple's capital spending?")}
 
 # metric_name → (human label, tolerance). Tolerances match the golden fixture precision.
 _METRICS = {
@@ -172,22 +184,26 @@ def build() -> list[dict[str, Any]]:
         sources=["{t}_10k"],
         tags=["multi_hop"],
     )
-    # A bank has no gross margin (DR-042): its gross-margin templates must be declined like the
-    # numeric one. Relabelled in place so question ids stay stable across eval runs.
-    no_gross_margin = {
-        c["ticker"] for c in companies if c["metrics"].get("gross_margin", {}).get("value") is None
-    }
+    # Templates run for every company, but some questions have no true answer for one of them.
+    # Relabelled in place so question ids stay stable across eval runs (ADR-0065).
     for row in rows:
-        if (
-            row["company"] in no_gross_margin
-            and "gross margin" in row["question"]
-            and not row["must_abstain"]
-        ):
+        if row["must_abstain"]:
+            continue
+        ticker, question = row["company"], row["question"]
+        metric = next((m for phrase, m in _TEMPLATE_METRICS.items() if phrase in question), None)
+        if metric and not load_concept_map(ticker=ticker).applies(metric):  # DR-042, a bank's capex
             row.update(
-                expected_answer=f"Not applicable for {_NAMES[row['company']]} (sector).",
+                expected_answer=f"Not applicable for {_NAMES[ticker]} (sector).",
                 expected_sources=[],
                 must_abstain=True,
                 tags=[*row["tags"], "sector_applicability", "abstain"],
+            )
+        elif (ticker, question) in _NO_DISCLOSURE:
+            row.update(
+                expected_answer="Insufficient evidence: the sources do not discuss it.",
+                expected_sources=[],
+                must_abstain=True,
+                tags=[*row["tags"], "no_disclosure", "abstain"],
             )
 
     # --- Safety / abstain categories (must_abstain = True) ---

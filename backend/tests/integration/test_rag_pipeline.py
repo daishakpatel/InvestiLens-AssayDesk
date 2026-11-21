@@ -19,6 +19,7 @@ from alembic.config import Config
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
+from app.citation.resolver import resolve_source
 from app.embeddings.pipeline import embed_pending
 from app.models import (
     Company,
@@ -174,6 +175,45 @@ def test_metric_question_skips_document_search(
     assert result.evidence == [] and result.sufficient is True
 
 
+def test_two_metric_growth_question_uses_stored_growth(  # RAG-030, ADR-0066
+    session: Session, corpus: Company, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _boom(*_a: object, **_k: object) -> list:  # type: ignore[type-arg]
+        raise AssertionError("a growth comparison is answered from stored figures")
+
+    monkeypatch.setattr(retrieval_mod, "vector_search", _boom)
+    monkeypatch.setattr(retrieval_mod, "keyword_search", _boom)
+    for name, fy, value in (
+        ("revenue", 2024, "50000000000"),
+        ("net_income", 2024, "10000000000"),
+        ("net_income", 2025, "15000000000"),
+    ):
+        session.add(
+            FinancialMetric(
+                company_id=corpus.id,
+                period=f"FY{fy}",
+                fiscal_year=fy,
+                period_type="FY",
+                metric_name=name,
+                metric_value=Decimal(value),
+                unit="USD",
+                source_id=f"xbrl:TST:{name}:FY{fy}",
+                is_latest=True,
+            )
+        )
+    session.flush()
+
+    question = "Did revenue grow faster than its net income last year?"
+    result = run_retrieval(session, question=question, ticker="TST")
+    assert result.sufficient is True and result.evidence == []
+    assert result.structured_source_ids == [
+        "derived:TST:revenue_yoy:FY2024-FY2025",
+        "derived:TST:net_income_yoy:FY2024-FY2025",
+    ]
+    detail = resolve_source(session, result.structured_source_ids[1])
+    assert detail is not None and detail.text == "Net income growth for FY2025 was 50%"
+
+
 # --- DoD 2: fusion + rerank returns plausible top-K for a risk query ---
 
 
@@ -302,6 +342,8 @@ def test_sector_inapplicable_metric_abstains(session: Session, corpus: Company) 
     session.flush()
     why = run_retrieval(session, question="What drove the change in gross margin?", ticker="TST")
     assert why.sufficient is False and why.abstain_reason == "not_applicable_sector"
+    capex = run_retrieval(session, question="How was capital spending described?", ticker="TST")
+    assert capex.not_applicable == ("capex",)  # a bank has no capex line either
     # Plain "margins" includes net margin, which a bank has, so it still searches.
     margins = run_retrieval(session, question="What did management say on margins?", ticker="TST")
     assert margins.abstain_reason != "not_applicable_sector"

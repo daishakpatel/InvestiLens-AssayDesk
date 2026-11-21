@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-20T23:22:43+00:00",
-  "git_sha": "5c937b08365d1f5f0f7d5fe515abbc88ae9f6352",
+  "generated_at": "2026-11-21T23:11:30+00:00",
+  "git_sha": "82ef4bdb93f0a05cf7ec6aefb6b3011a2884b707",
   "dirty": true,
-  "inputs_hash": "9635e5e69f609f94f548e29e7503bf9f7f7c3c8d8c4bf6122fd638b1cdc634d5",
+  "inputs_hash": "eb03b7303f9776868f1e59ad3c17752828d3d0c234ebffe1774fe4f2a29b1c74",
   "llm": {
     "mode": "live",
     "model": "gemini-3.8-flash"
@@ -25,52 +25,52 @@
   "metrics": {
     "citation_validity": {
       "value": 1.0,
-      "successes": 334,
-      "n": 334,
+      "successes": 338,
+      "n": 338,
       "ci95": [
-        0.9886,
+        0.9888,
         1.0
       ]
     },
     "number_match": {
-      "value": 0.9927,
-      "successes": 273,
-      "n": 275,
+      "value": 0.9928,
+      "successes": 276,
+      "n": 278,
       "ci95": [
-        0.9739,
+        0.9742,
         0.998
       ]
     },
     "correct_abstention": {
       "value": 1.0,
-      "successes": 26,
-      "n": 26,
+      "successes": 28,
+      "n": 28,
       "ci95": [
-        0.8713,
+        0.8794,
         1.0
       ]
     },
     "false_abstention": {
-      "value": 0.0875,
-      "successes": 7,
-      "n": 80,
+      "value": 0.0256,
+      "successes": 2,
+      "n": 78,
       "ci95": [
-        0.043,
-        0.1698
+        0.0071,
+        0.0888
       ]
     },
     "retrieval_hit_at_5": {
       "value": 1.0,
-      "successes": 40,
-      "n": 40,
+      "successes": 35,
+      "n": 35,
       "ci95": [
-        0.9124,
+        0.9011,
         1.0
       ]
     },
     "retrieval_mrr": {
-      "value": 0.8167,
-      "n": 40
+      "value": 0.7905,
+      "n": 35
     },
     "injection_resistance": {
       "value": 1.0,
@@ -85,12 +85,12 @@
   "latency": {
     "chat": {
       "p50_ms": 10.0,
-      "p95_ms": 7482.0,
+      "p95_ms": 7027.0,
       "n": 112
     },
     "report": {
-      "p50_ms": 59991.073874989524,
-      "p95_ms": 67255.08987496141,
+      "p50_ms": 58922.20874992199,
+      "p95_ms": 64152.08833292127,
       "n": 3
     },
     "note": "Single-user timings with the live model on the machine that ran the report."
@@ -106,11 +106,11 @@
     "by_purpose": {
       "chat": {
         "calls": 111,
-        "usd": "0.2185"
+        "usd": "0.1894"
       },
       "earnings_brief": {
         "calls": 1,
-        "usd": "0.0033"
+        "usd": "0.0032"
       },
       "embedding": {
         "calls": 32,
@@ -122,17 +122,17 @@
       },
       "guidance_extract": {
         "calls": 1,
-        "usd": "0.0033"
+        "usd": "0.0034"
       },
       "note_summary": {
         "calls": 8,
-        "usd": "0.0300"
+        "usd": "0.0304"
       },
       "report_section": {
         "calls": 36,
-        "usd": "0.2199"
+        "usd": "0.2248"
       }
     },
-    "total_usd": "0.5994"
+    "total_usd": "0.5756"
   }
 }

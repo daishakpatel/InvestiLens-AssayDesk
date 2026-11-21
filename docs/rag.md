@@ -105,7 +105,7 @@ assembled context block, and a `sufficient` flag. It **generates no answer** —
    `MANAGEMENT_COMMENTARY`, `COMPARISON`, `FILING_DIFF`, `OUT_OF_SCOPE_ADVICE`, `OUT_OF_SCOPE`.
    Advice/out-of-scope abstain before any retrieval, and so does a question whose named metrics
    are all N/A for the company's sector (`sector_applicability.yaml`, DR-042): "what drove
-   JPMorgan's gross margin?" is declined (`not_applicable_sector`), not explained from documents,
+   JPMorgan's gross margin?" or its capital spending is declined (`not_applicable_sector`), not explained from documents,
    while plain "margins" still searches because a bank has a net margin.
 2. **Query rewriting** (`rewrite.py`, RAG-003) — expand financial synonyms ("gross margin" ↔
    "gross profit percentage"), resolve relative time ("last three years" → fiscal years via
@@ -115,6 +115,9 @@ assembled context block, and a `sufficient` flag. It **generates no answer** —
    Sep 29", "share price today"; `prices.py`) is answered first, from the stored daily bar on or
    before the asked day, cited `price:<TICKER>:<date>` (ADR-0054). Plain "margins" asks for gross,
    operating and net margin; a "trend" with no stated period covers the last five fiscal years.
+   A growth comparison naming two or more stored flows ("did revenue grow faster than net
+   income?") gets each one's growth into the latest (or stated) fiscal year from the finance
+   layer, cited by its growth ID, never document search or model arithmetic (ADR-0066).
    "What did management say about X" is commentary, never a metric lookup.
 4. **Retrieval** (`retrieval.py`, RAG-010…018) — vector + keyword search over the rewritten query
    and its sub-queries → **RRF fusion** (`fusion.py`, k=60) → **boilerplate dedup** (keep the

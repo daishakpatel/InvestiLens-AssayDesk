@@ -13,8 +13,9 @@ generates nothing itself. Sources: spec §13 (citations), §14 (hallucination/co
   Reports call `strip_markers` on each item first, because models also write markers inside JSON
   text. `strip_markers` reads `[SOURCE:a]`, `[source_id=a, source_id=b]`, `[cite: a; b]` and a bare
   ID with a known prefix (`[news:12]`); the IDs are then checked like any other.
-- Report growth figures cite `derived:<TICKER>:revenue_<yoy|cagr>:FY<start>-FY<end>`. No row stores
-  them: the resolver recomputes each from those two years' revenue (ADR-0055).
+- Growth figures cite `derived:<TICKER>:<metric>_<yoy|cagr>:FY<start>-FY<end>` (reports use
+  revenue; chat growth comparisons any stored FY metric, e.g. `net_income_yoy`). No row stores
+  them: the resolver recomputes each from those two years' stored values (ADR-0055, ADR-0066).
 - `persist(session, output, report_id=|chat_message_id=)` — log every claim to
   `claim_verifications` (CIT-005 L6).
 
