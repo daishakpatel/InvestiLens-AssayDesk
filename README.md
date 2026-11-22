@@ -77,7 +77,7 @@ make up && make seed                   # Postgres, Redis, API, workers, frontend
 
 `make check` runs lint, types, tests and the docs-consistency gate.
 <!-- generated:stats -->
-859 backend and 148 frontend test functions, 93 Playwright tests, 96 API operations and 66 ADRs ([generated](docs/generated/stats.json)).
+860 backend and 148 frontend test functions, 93 Playwright tests, 96 API operations and 67 ADRs ([generated](docs/generated/stats.json)).
 <!-- /generated:stats -->
 
 ## Limits and method

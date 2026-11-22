@@ -120,6 +120,9 @@ assembled context block, and a `sufficient` flag. It **generates no answer** —
    layer, cited by its growth ID, never document search or model arithmetic (ADR-0066).
    "What did management say about X" is commentary, never a metric lookup.
 4. **Retrieval** (`retrieval.py`, RAG-010…018) — vector + keyword search over the rewritten query
+   (for chat, the keyword and rerank queries drop question-frame words such as "management",
+   "say", "characterize" and the company's own name and ticker, which name nothing to find in its
+   own filings; the vector query keeps the full question; ADR-0067)
    and its sub-queries → **RRF fusion** (`fusion.py`, k=60) → **boilerplate dedup** (keep the
    latest of a `dedup_hash` cluster, annotate "unchanged since") → **rerank** (`rerank.py`) →
    **diversity cap** (≤ `rag_max_chunks_per_document`) + **time-aware** selection (recency boost

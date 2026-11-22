@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-21T23:11:30+00:00",
-  "git_sha": "82ef4bdb93f0a05cf7ec6aefb6b3011a2884b707",
+  "generated_at": "2026-11-22T00:06:13+00:00",
+  "git_sha": "45df4fb9a9a9d1bc2ce24b7bce05b51ee8497ef4",
   "dirty": true,
-  "inputs_hash": "eb03b7303f9776868f1e59ad3c17752828d3d0c234ebffe1774fe4f2a29b1c74",
+  "inputs_hash": "0438f26855152153987208f2de76eb43c98fcc5af5de948407738d66c8b6eae6",
   "llm": {
     "mode": "live",
     "model": "gemini-3.8-flash"
@@ -25,20 +25,20 @@
   "metrics": {
     "citation_validity": {
       "value": 1.0,
-      "successes": 338,
-      "n": 338,
+      "successes": 392,
+      "n": 392,
       "ci95": [
-        0.9888,
+        0.9903,
         1.0
       ]
     },
     "number_match": {
-      "value": 0.9928,
-      "successes": 276,
-      "n": 278,
+      "value": 1.0,
+      "successes": 369,
+      "n": 369,
       "ci95": [
-        0.9742,
-        0.998
+        0.9897,
+        1.0
       ]
     },
     "correct_abstention": {
@@ -51,12 +51,12 @@
       ]
     },
     "false_abstention": {
-      "value": 0.0256,
-      "successes": 2,
+      "value": 0.0128,
+      "successes": 1,
       "n": 78,
       "ci95": [
-        0.0071,
-        0.0888
+        0.0023,
+        0.0691
       ]
     },
     "retrieval_hit_at_5": {
@@ -69,7 +69,7 @@
       ]
     },
     "retrieval_mrr": {
-      "value": 0.7905,
+      "value": 0.8476,
       "n": 35
     },
     "injection_resistance": {
@@ -84,13 +84,13 @@
   },
   "latency": {
     "chat": {
-      "p50_ms": 10.0,
-      "p95_ms": 7027.0,
+      "p50_ms": 15.0,
+      "p95_ms": 8095.0,
       "n": 112
     },
     "report": {
-      "p50_ms": 58922.20874992199,
-      "p95_ms": 64152.08833292127,
+      "p50_ms": 59741.704209009185,
+      "p95_ms": 66322.2982500447,
       "n": 3
     },
     "note": "Single-user timings with the live model on the machine that ran the report."
@@ -106,11 +106,11 @@
     "by_purpose": {
       "chat": {
         "calls": 111,
-        "usd": "0.1894"
+        "usd": "0.2062"
       },
       "earnings_brief": {
         "calls": 1,
-        "usd": "0.0032"
+        "usd": "0.0034"
       },
       "embedding": {
         "calls": 32,
@@ -118,21 +118,21 @@
       },
       "governance_facts": {
         "calls": 1,
-        "usd": "0.0044"
+        "usd": "0.0042"
       },
       "guidance_extract": {
         "calls": 1,
-        "usd": "0.0034"
+        "usd": "0.0033"
       },
       "note_summary": {
         "calls": 8,
-        "usd": "0.0304"
+        "usd": "0.0299"
       },
       "report_section": {
         "calls": 36,
-        "usd": "0.2248"
+        "usd": "0.2262"
       }
     },
-    "total_usd": "0.5756"
+    "total_usd": "0.5932"
   }
 }

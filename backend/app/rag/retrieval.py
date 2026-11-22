@@ -9,6 +9,7 @@ selection, expand parent-child context, and judge sufficiency. Structured-metric
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -147,9 +148,17 @@ def retrieve_evidence(
     rewritten: RewrittenQuery,
     settings: Settings | None = None,
     scope: SearchScope | None = None,
+    keyword_noise: re.Pattern[str] | None = None,
 ) -> RetrievalOutcome:
-    """Run the full document retrieval + ranking pipeline for one company (RAG-010…018)."""
+    """Run the full document retrieval + ranking pipeline for one company (RAG-010…018).
+
+    `keyword_noise` (chat, ADR-0067) is cut from the keyword and rerank queries, not the vector one.
+    """
     settings = settings or get_settings()
+
+    def lexical(q: str) -> str:
+        return " ".join(keyword_noise.sub(" ", q).split()) if keyword_noise else q
+
     top_n = settings.rag_candidate_top_n
     top_k = settings.rag_rerank_top_k
 
@@ -168,7 +177,7 @@ def retrieve_evidence(
             [
                 h.chunk_id
                 for h in keyword_search(
-                    session, query=q, company_id=company_id, limit=top_n, scope=scope
+                    session, query=lexical(q), company_id=company_id, limit=top_n, scope=scope
                 )
             ]
         )
@@ -183,7 +192,7 @@ def retrieve_evidence(
     ]
 
     evidence = _dedup_boilerplate(evidence)
-    reranked = get_reranker().rerank(rewritten.expanded, evidence)
+    reranked = get_reranker().rerank(lexical(rewritten.expanded), evidence)
     if rewritten.is_latest:
         reranked = _apply_recency(reranked)
 

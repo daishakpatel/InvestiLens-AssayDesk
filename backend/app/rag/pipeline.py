@@ -109,6 +109,23 @@ def _growth_answer(
     return blocks, source_ids, [{"tool": c.name, "latency_ms": c.latency_ms} for c in runner.log]
 
 
+# Words that frame a question but name nothing to find: every word counts in keyword ranking and
+# the lexical reranker, so "management" and the company's own name (in nearly every passage of its
+# own filings) outranked the passage that answers "how did management characterize capex?".
+_FRAME_WORDS = (
+    r"how|did|does|do|what|why|explain|tell|about|management|say|said|says|"
+    r"characteri[sz]e[ds]?|describe[ds]?|discuss(?:e[ds])?|comment(?:ed|s)?"
+)
+_LEGAL_SUFFIX = {"inc", "corp", "corporation", "co", "company", "ltd", "plc", "holdings", "the"}
+
+
+def _keyword_noise(company: Company) -> re.Pattern[str]:
+    """Frame words plus the company's own ticker and name words, possessive included (ADR-0067)."""
+    words = {w for w in re.findall(r"[a-z0-9]+", company.name.lower()) if w not in _LEGAL_SUFFIX}
+    names = "|".join(re.escape(w) for w in sorted({company.ticker.lower(), *words}))
+    return re.compile(rf"\b(?:{_FRAME_WORDS}|{names})(?:['\u2019]s)?\b", re.I)
+
+
 def _extract_metrics(question: str) -> tuple[str, ...]:
     for pattern, names in _METRIC_LEXICON:
         if pattern.search(question):
@@ -341,7 +358,11 @@ def _run_retrieval(
 
     # Document intents: hybrid retrieval → fusion → rerank → assemble.
     outcome = retrieve_evidence(
-        session, company_id=company.id, rewritten=rewritten, settings=settings
+        session,
+        company_id=company.id,
+        rewritten=rewritten,
+        settings=settings,
+        keyword_noise=_keyword_noise(company),
     )
     evidence: list[Evidence] = outcome.evidence
     assembled = assemble_context(intent=intent, evidence=evidence, structured_blocks=[])

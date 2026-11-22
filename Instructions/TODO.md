@@ -70,14 +70,14 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       itemised by purpose in the report. Judge faithfulness is still not measured (`FakeJudge`).
       After the fixes in "Done" (2026-11-19): false abstention 8.5% (7/82), number match 99.3%,
       MRR 0.8135 (n=42), report p50 59 s, $0.62 a run. `[code]`
-- [ ] **Live model declines 2 of 78 answerable questions** (2026-11-21, `docs/eval/live.md`, $0.58;
-      was 7/80 on 2026-11-20). Fixed: "did revenue grow faster than net income?" is answered from
-      stored growth (ADR-0066); JPMorgan's capital spending is declined as N/A for a bank, and
-      Apple's relabelled must-abstain since its filings never discuss it (ADR-0065 amendment).
-      Left: NVIDIA capital spending (its 10-Q's commitments note describes capex, so the passage
-      exists; check whether management-commentary scope reaches 10-Q notes) and JPMorgan "demand
-      for products" (declined in two runs in a row). Apple profitability, declined before, was
-      answered this run. `[code]`
+- [ ] **Live model declines 1 of 78 answerable questions** (2026-11-21, `docs/eval/live.md`, $0.59;
+      7/80 on 2026-11-20, 2/78 earlier on 2026-11-21). NVIDIA capital spending and JPMorgan
+      "demand for products" are now answered: chat keyword and rerank queries drop frame words and
+      the company's own name (ADR-0067; live MRR 0.79 → 0.85, mock 0.72 → 0.81). Earlier fixes:
+      growth comparisons from stored figures (ADR-0066), bank gross margin/capex declined as N/A
+      and golden labels that follow the fixtures (ADR-0065). Left: "What factors affected Apple's
+      profitability last year?", answered in one run and declined in the others; the model judges
+      the retrieved passages insufficient. `[code]`
 - [x] **Dev DB: 468 re-captioned table chunks are not embedded**: embedded 2026-11-20 after the
       credit top-up (4 batches, $0.034), so they are found by vector search again. The 67 documents
       whose tables gain a unit from the line above (dry run over every stored filing: AAPL 25,

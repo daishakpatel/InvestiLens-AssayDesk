@@ -10,6 +10,7 @@ from datetime import date
 
 import pytest
 
+from app.models import Company
 from app.rag import tools as tool_mod
 from app.rag.assembly import assemble_context
 from app.rag.fusion import reciprocal_rank_fusion
@@ -21,7 +22,7 @@ from app.rag.injection import (
     wrap_untrusted,
 )
 from app.rag.intent import classify_intent
-from app.rag.pipeline import _is_metric_trend
+from app.rag.pipeline import _is_metric_trend, _keyword_noise
 from app.rag.rerank import IdentityReranker, LexicalReranker
 from app.rag.rewrite import rewrite_query
 from app.rag.tools import ToolBudgetExceeded, ToolLoopDetected, ToolRunner
@@ -76,6 +77,14 @@ def test_classify_intent(question: str, expected: Intent) -> None:
 
 def test_weather_as_a_business_factor_stays_in_scope() -> None:
     assert classify_intent("Did weather hurt sales last quarter?").intent != Intent.OUT_OF_SCOPE
+
+
+def test_keyword_noise_drops_frame_words_and_the_company_itself() -> None:  # ADR-0067
+    noise = _keyword_noise(Company(ticker="JPM", name="JPMORGAN CHASE & CO"))
+    question = "What did management say about demand for JPMorgan\u2019s products? (JPM, Chase)"
+    assert " ".join(noise.sub(" ", question).split()) == "demand for products? ( , )"
+    # Only the company's own name: another company named in the question is kept.
+    assert "NVIDIA" in noise.sub(" ", "How does JPMorgan compare with NVIDIA's capex?")
 
 
 def test_metric_lookup_beats_why_question() -> None:
