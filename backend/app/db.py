@@ -26,6 +26,10 @@ logger = get_logger(__name__)
 # let through never has to wait for a connection (ADR-0029). The overflow is for sessions opened
 # outside a request.
 _REQUEST_SLOTS = 10
+# A chat turn holds its session through embedding and model calls (seconds, not milliseconds), so
+# chat has its own slots: under load it queues behind other chats, never in front of reads
+# (ADR-0068). The pool holds both, so no admitted request waits for a connection.
+_CHAT_SLOTS = 6
 _POOL_OVERFLOW = 5
 # How long a request waits for a slot before it is turned away with a 503, not queued forever.
 _SLOT_WAIT_S = 10.0
@@ -37,7 +41,7 @@ def get_engine() -> Engine:
     return create_engine(
         get_settings().database_url,
         pool_pre_ping=True,
-        pool_size=_REQUEST_SLOTS,
+        pool_size=_REQUEST_SLOTS + _CHAT_SLOTS,
         max_overflow=_POOL_OVERFLOW,
         future=True,
     )
@@ -62,16 +66,23 @@ def session_scope() -> Iterator[Session]:
         session.close()
 
 
-# One gate per event loop: asyncio primitives cannot be shared between loops, and tests run several.
-_gates: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = WeakKeyDictionary()
+# Gates per event loop: asyncio primitives cannot be shared between loops, and tests run several.
+_gates: WeakKeyDictionary[asyncio.AbstractEventLoop, dict[bool, asyncio.Semaphore]] = (
+    WeakKeyDictionary()
+)
 
 
-def _request_gate() -> asyncio.Semaphore:
-    loop = asyncio.get_running_loop()
-    gate = _gates.get(loop)
-    if gate is None:
-        gate = _gates[loop] = asyncio.Semaphore(_REQUEST_SLOTS)
-    return gate
+def _request_gate(*, chat: bool = False) -> asyncio.Semaphore:
+    gates = _gates.setdefault(asyncio.get_running_loop(), {})
+    if chat not in gates:
+        gates[chat] = asyncio.Semaphore(_CHAT_SLOTS if chat else _REQUEST_SLOTS)
+    return gates[chat]
+
+
+async def get_chat_db() -> AsyncIterator[Session]:
+    """`get_db` for a chat turn, on the chat gate (ADR-0068). Same scope rules as `get_db`."""
+    async for session in _gated_session(chat=True):
+        yield session
 
 
 async def get_db() -> AsyncIterator[Session]:
@@ -87,7 +98,12 @@ async def get_db() -> AsyncIterator[Session]:
     response is sent: a client that reads slowly then does not keep a slot. Handlers return
     schema objects, never ORM rows.
     """
-    gate = _request_gate()
+    async for session in _gated_session(chat=False):
+        yield session
+
+
+async def _gated_session(*, chat: bool) -> AsyncIterator[Session]:
+    gate = _request_gate(chat=chat)
     try:
         await asyncio.wait_for(gate.acquire(), _SLOT_WAIT_S)
     except TimeoutError:

@@ -7,11 +7,11 @@
     "total": 1101
   },
   "endpoints": 96,
-  "adrs": 67,
+  "adrs": 68,
   "seed_companies": 3,
   "loc": {
-    "backend_app": 32431,
-    "backend_tests": 17233,
+    "backend_app": 32474,
+    "backend_tests": 17247,
     "frontend_src": 26430,
     "e2e": 2741,
     "scripts": 2948

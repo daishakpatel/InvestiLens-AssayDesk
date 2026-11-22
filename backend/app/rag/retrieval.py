@@ -21,7 +21,7 @@ from app.ingestion.documents.tokens import estimate_tokens
 from app.rag.evidence import build_evidence
 from app.rag.fusion import reciprocal_rank_fusion
 from app.rag.rerank import get_reranker
-from app.rag.search import keyword_search, vector_search
+from app.rag.search import keyword_search, vector_search_many
 from app.rag.types import Evidence, RewrittenQuery, SearchScope
 from app.repositories import chunks as chunk_repo
 from app.utils.logging import get_logger, log_event
@@ -163,16 +163,16 @@ def retrieve_evidence(
     top_k = settings.rag_rerank_top_k
 
     queries = [rewritten.expanded, *rewritten.sub_queries]
+    try:
+        semantic = vector_search_many(
+            session, queries=queries, company_id=company_id, limit=top_n, scope=scope
+        )
+    except Exception as exc:  # embedding provider down or over quota: keyword search carries on
+        log_event(logger, logging.WARNING, "rag.vector_search.failed", error=str(exc))
+        semantic = [[] for _ in queries]
     ranked_lists: list[list[int]] = []
-    for q in queries:
-        try:
-            semantic = vector_search(
-                session, query=q, company_id=company_id, limit=top_n, scope=scope
-            )
-        except Exception as exc:  # embedding provider down or over quota: keyword search carries on
-            log_event(logger, logging.WARNING, "rag.vector_search.failed", error=str(exc))
-            semantic = []
-        ranked_lists.append([h.chunk_id for h in semantic])
+    for q, hits in zip(queries, semantic, strict=True):
+        ranked_lists.append([h.chunk_id for h in hits])
         ranked_lists.append(
             [
                 h.chunk_id

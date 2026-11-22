@@ -17,6 +17,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
     ConsoleSpanExporter,
     SimpleSpanProcessor,
     SpanExporter,
@@ -38,11 +39,15 @@ def configure_tracing(*, exporter: SpanExporter | None = None) -> TracerProvider
     a real app/script still gets a single provider configured once at startup.
     """
     global _PROVIDER
-    chosen = exporter or _default_exporter()
     if _PROVIDER is None:
         _PROVIDER = TracerProvider(resource=Resource.create({SERVICE_NAME: "assay-desk-api"}))
         trace.set_tracer_provider(_PROVIDER)
-    _PROVIDER.add_span_processor(SimpleSpanProcessor(chosen))
+    # An injected exporter (tests) sees each span as it ends. The app's own exporter runs on a
+    # background thread: exporting inline put a JSON dump of every span on the request path, which
+    # the 2026-11-22 load test showed in the p95 (ADR-0068).
+    _PROVIDER.add_span_processor(
+        SimpleSpanProcessor(exporter) if exporter else BatchSpanProcessor(_default_exporter())
+    )
     return _PROVIDER
 
 

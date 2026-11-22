@@ -16,7 +16,7 @@ from app.api.pagination import NEXT_CURSOR_HEADER, clamp_limit, decode_cursor, e
 from app.chat.service import ChatTurn, answer_question
 from app.chat.streaming import sse_events
 from app.config import get_settings
-from app.db import get_db
+from app.db import get_chat_db, get_db
 from app.repositories import chat as chat_repo
 from app.schemas.chat import (
     AskedQuestion,
@@ -31,6 +31,7 @@ from app.schemas.chat import (
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 _DB = Depends(get_db, scope="function")
+_CHAT_DB = Depends(get_chat_db, scope="function")  # a chat turn: its own slots (ADR-0068)
 _USER = Depends(get_current_user_id)
 
 
@@ -61,7 +62,7 @@ def _session_id(body: ChatRequest) -> int | None:
 @router.post("", response_model=ChatResponse)
 def chat(
     body: ChatRequest,
-    db: Session = _DB,
+    db: Session = _CHAT_DB,
     user_id: int = _USER,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> ChatResponse:
@@ -77,7 +78,9 @@ def chat(
 
 
 @router.post("/stream")
-def chat_stream(body: ChatRequest, db: Session = _DB, user_id: int = _USER) -> StreamingResponse:
+def chat_stream(
+    body: ChatRequest, db: Session = _CHAT_DB, user_id: int = _USER
+) -> StreamingResponse:
     """SSE token stream over a verified answer (API-004)."""
     turn = answer_question(
         db,

@@ -22,6 +22,7 @@ import os
 import random
 
 from locust import HttpUser, between, task
+from locust.exception import StopUser
 
 _TICKERS = ["NVDA", "AAPL", "JPM"]
 _PREFIXES = ["nvi", "app", "jpm", "nvda"]
@@ -48,7 +49,7 @@ class ReadUser(HttpUser):
         t = random.choice(_TICKERS)  # noqa: S311
         self.client.get(
             f"{_API}/companies/{t}/financials",
-            params={"metrics": "revenue,net_income", "period_type": "annual"},
+            params={"metrics": "revenue,net_income", "period_type": "FY"},
             name="financials",
         )
 
@@ -61,8 +62,7 @@ class ChatUser(HttpUser):
     def on_start(self) -> None:
         token = os.environ.get("ASSAY_DESK_TOKEN")
         if not token:
-            self.environment.runner.quit()  # no auth → skip chat load
-            return
+            raise StopUser()  # no auth → this user stops; the read users keep running
         self.client.headers.update({"Authorization": f"Bearer {token}"})
 
     @task
@@ -70,6 +70,6 @@ class ChatUser(HttpUser):
         t = random.choice(_TICKERS)  # noqa: S311
         self.client.post(
             f"{_API}/chat",
-            json={"ticker": t, "question": "What drove revenue growth last year?"},
+            json={"company": t, "question": "What drove revenue growth last year?"},
             name="chat",
         )

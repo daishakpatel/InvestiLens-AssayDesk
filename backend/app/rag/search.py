@@ -75,6 +75,31 @@ def vector_search(
     )
 
 
+def vector_search_many(
+    session: Session,
+    *,
+    queries: Sequence[str],
+    company_id: int,
+    limit: int = 40,
+    scope: SearchScope | None = None,
+) -> list[list[SearchHit]]:
+    """`vector_search` for several queries with one embedding call, not one per query: a chat
+    question's 4 rewrites cost 4 sequential round trips before (ADR-0068)."""
+    client = get_embedding_client()
+    vectors = asyncio.run(client.embed(list(queries), input_type="query"))  # RAG-010
+    return [
+        vector_search_by_vector(
+            session,
+            vector=[float(x) for x in vector],
+            company_id=company_id,
+            limit=limit,
+            model=client.model_name,
+            scope=scope,
+        )
+        for vector in vectors
+    ]
+
+
 def vector_search_by_vector(
     session: Session,
     *,
