@@ -248,3 +248,10 @@ def test_division_never_raises_on_bad_base(denominator: Decimal) -> None:
 def test_margin_is_ratio_of_inputs(numerator: Decimal, denominator: Decimal) -> None:
     result = m.net_margin(numerator, denominator)
     assert result.value == numerator / denominator
+
+
+def test_average_uses_valued_years_and_needs_three() -> None:  # spec §10.7, ADR-0069
+    loss_year = None  # a P/E is N/A in a loss year, never zero
+    result = m.average([Decimal("10"), Decimal("20"), loss_year, Decimal("60")], unit=m.MULTIPLE)
+    assert result.value == Decimal("30") and result.unit == m.MULTIPLE
+    assert m.average([Decimal("10"), loss_year, Decimal("20")], unit=m.MULTIPLE).value is None

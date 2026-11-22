@@ -29,7 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.finance.display import describe_metric, format_price
-from app.finance.metrics import cagr, yoy_growth
+from app.finance.metrics import MULTIPLE, average, cagr, yoy_growth
 from app.finance.valuation_builder import (
     LATEST_TTM_SINCE,
     VALUATION_METRICS,
@@ -61,7 +61,7 @@ from app.schemas.sources import (
     XbrlFactSource,
 )
 
-_METRIC_GROWTH = re.compile(r"derived:([^:]+):([a-z_]+?)_(yoy|cagr):FY(\d{4})-FY(\d{4})")
+_METRIC_GROWTH = re.compile(r"derived:([^:]+):([a-z_]+?)_(yoy|cagr|avg):FY(\d{4})-FY(\d{4})")
 _DATED_VALUATION = re.compile(r"derived:([^:]+):([a-z_]+):(\d{4}-\d{2}-\d{2})")
 _NUMERIC_SCALE = Decimal("0.00000001")  # financial_metrics.metric_value is NUMERIC(28, 8)
 
@@ -247,7 +247,8 @@ def _valuation_on(session: Session, source_id: str, match: re.Match[str]) -> Sou
 
 
 def _metric_growth(session: Session, source_id: str, match: re.Match[str]) -> SourceDetail | None:
-    """A growth figure, recomputed from the two stored FY rows its ID names (ADR-0055, ADR-0066)."""
+    """A growth figure or multi-year average, recomputed from the stored FY rows its ID names
+    (ADR-0055, ADR-0066, ADR-0069)."""
     ticker, metric, kind = match[1], match[2], match[3]
     start, end = int(match[4]), int(match[5])
     rows = {
@@ -260,27 +261,36 @@ def _metric_growth(session: Session, source_id: str, match: re.Match[str]) -> So
                 FinancialMetric.metric_name == metric,
                 FinancialMetric.period_type == "FY",
                 FinancialMetric.is_latest.is_(True),
-                FinancialMetric.fiscal_year.in_([start, end]),
+                FinancialMetric.fiscal_year.between(start, end),
             )
         )
     }
     if start not in rows or end not in rows:
         return None
     first, last = rows[start], rows[end]
-    result = (
-        yoy_growth(last.metric_value, first.metric_value)
-        if kind == "yoy"
-        else cagr(first.metric_value, last.metric_value, end - start)
-    )
+    if kind == "avg":  # the years with a value, as the report averaged them
+        span = [rows[y] for y in range(start, end + 1) if y in rows]
+        used = [r for r in span if r.metric_value is not None]
+        result = average([r.metric_value for r in used], unit=first.unit or MULTIPLE)
+        name, period = f"{metric}_avg", f"FY{start} to FY{end}"
+    else:
+        used = [first, last]
+        result = (
+            yoy_growth(last.metric_value, first.metric_value)
+            if kind == "yoy"
+            else cagr(first.metric_value, last.metric_value, end - start)
+        )
+        # Revenue keeps "yoy_growth"/"cagr" (reads "Revenue growth"); others "Net income growth".
+        suffix = "growth" if kind == "yoy" else "cagr"
+        name = result.formula_id if metric == "revenue" else f"{metric}_{suffix}"
+        period = f"FY{end}"
     if result.value is None:
         return None
-    # Revenue keeps "yoy_growth"/"cagr" (reads "Revenue growth"); others read "Net income growth".
-    suffix = "growth" if kind == "yoy" else "cagr"
     return _metric(
         FinancialMetric(  # never added to the session: this figure is computed, not stored
             source_id=source_id,
-            metric_name=result.formula_id if metric == "revenue" else f"{metric}_{suffix}",
-            period=f"FY{end}",
+            metric_name=name,
+            period=period,
             metric_value=result.value,
             unit=result.unit,
             is_derived=True,
@@ -289,7 +299,7 @@ def _metric_growth(session: Session, source_id: str, match: re.Match[str]) -> So
                 "formula_version": result.formula_version,
                 "inputs": [
                     {"name": metric, "period": row.period, "source_id": row.source_id}
-                    for row in (first, last)
+                    for row in used
                 ],
             },
         )

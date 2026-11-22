@@ -97,7 +97,7 @@ def metric_label(name: str) -> str:
     if (
         name not in _LABELS
     ):  # "net_income_growth" → "Net income growth", "eps_diluted_cagr" → "… CAGR"
-        for suffix, word in (("_growth", "growth"), ("_cagr", "CAGR")):
+        for suffix, word in (("_growth", "growth"), ("_cagr", "CAGR"), ("_avg", "average")):
             if name.endswith(suffix):
                 return f"{metric_label(name.removesuffix(suffix))} {word}"
     return _LABELS.get(name) or name.replace("_", " ").capitalize()

@@ -108,6 +108,19 @@ def yoy_growth(current: Num, prior: Num, *, sources: Sources = None) -> MetricRe
     )
 
 
+# A "5-year average" over fewer valued years than this is not shown (loss years have no P/E).
+MIN_AVERAGE_YEARS = 3
+
+
+def average(values: Sequence[Num], *, unit: str) -> MetricResult:
+    """Mean of the valued years (spec §10.7 "5Y Average P/E"); fewer than 3 is MISSING_INPUT."""
+    inputs = _inputs([(f"y{i}", v) for i, v in enumerate(values)], None)
+    present = [v for v in values if v is not None]
+    if len(present) < MIN_AVERAGE_YEARS:
+        return _fail(MISSING_INPUT, unit, "average", inputs)
+    return _ok(sum(present, Decimal(0)) / len(present), unit, "average", inputs)
+
+
 def cagr(start: Num, end: Num, years: int, *, sources: Sources = None) -> MetricResult:
     inputs = _inputs([("start", start), ("end", end)], sources)
     if start is None or end is None:

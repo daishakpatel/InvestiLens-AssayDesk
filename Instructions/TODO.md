@@ -122,9 +122,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [ ] **TTM EPS right after a split**: the identity takes each term's latest restatement, but a
       split after the last 10-K and before any filing restates the prior year still mixes share
       bases; the `share_count_changed` flag marks such windows (ADR-0040). `[code]`
-- [ ] **Five-year average multiples** (spec §10.7 "5Y Average P/E"): Phase 7h stores each
-      multiple at the last five fiscal year ends (point in time) and serves min/median/max in
-      `/valuation-bands`; the research report payload does not use them yet. `[code]`
+- [x] **Five-year average multiples** (spec §10.7 "5Y Average P/E"): done 2026-11-22 (ADR-0069).
+      The report's P/E and P/S carry `average` (mean of the valued fiscal years, at least three),
+      cited by a resolvable `derived:<T>:<metric>_avg:FY…-FY…` ID. Reports generated earlier
+      don't have it until regenerated. `[code]`
 - [x] **EV/EBITDA is N/A for AMD and Intel**: fixed in Phase 7h (ADR-0046). Neither tags a total
       D&A any more, so company overrides sum the parts they do tag (Intel FY2025 $11,706M, its
       statement's own lines; AMD FY2025 $3,050M, $46M of non-acquisition intangible amortization

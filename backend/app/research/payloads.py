@@ -81,6 +81,10 @@ def _series_block(
                 "source_id": metric_source_id(row),
             }
             evidence.append(from_metric(row))
+        avg_block, avg_ev = _average_block(session, company_id, name, rows)
+        if avg_block:
+            block["average"] = avg_block
+            evidence.extend(avg_ev)
 
     # Deterministic growth (backend math, never the LLM): YoY of the last pair + full-span CAGR.
     valued = [
@@ -95,6 +99,33 @@ def _series_block(
             block["calculated"] = calc
             evidence.extend(calc_ev)
     return block, evidence
+
+
+def _average_block(
+    session: Session, company_id: int, name: str, rows: list[Any]
+) -> tuple[dict[str, Any], list[EvidenceItem]]:
+    """A multiple's average over the shown fiscal years with a value (spec §10.7 "5Y Average P/E"),
+    cited by an ID the resolver recomputes from the same stored rows (ADR-0069)."""
+    valued = [r for r in rows if r.metric_value is not None and r.fiscal_year is not None]
+    if not valued or valued[0].unit != fin.MULTIPLE:
+        return {}, []
+    result = fin.average([r.metric_value for r in valued], unit=fin.MULTIPLE)
+    if result.value is None:
+        return {}, []
+    company = session.get(Company, company_id)
+    first, last = valued[0].fiscal_year, valued[-1].fiscal_year
+    sid = f"derived:{company.ticker if company else ''}:{name}_avg:FY{first}-FY{last}"
+    shown = format_metric_value(result.value, fin.MULTIPLE, metric=name)
+    evidence = _derived_ev(
+        sid,
+        f"{name}_avg",
+        result.value,
+        period=f"FY{first} to FY{last}",
+        inputs=[metric_source_id(r) for r in valued],
+        unit=fin.MULTIPLE,
+    )
+    span = f"FY{first} to FY{last}"
+    return {"value": shown, "years": len(valued), "span": span, "source_id": sid}, [evidence]
 
 
 def _growth_block(
@@ -141,7 +172,13 @@ def _growth_block(
 
 
 def _derived_ev(
-    source_id: str, formula_id: str, value: Decimal, *, period: str, inputs: list[str]
+    source_id: str,
+    formula_id: str,
+    value: Decimal,
+    *,
+    period: str,
+    inputs: list[str],
+    unit: str = "ratio",
 ) -> EvidenceItem:
     from app.schemas.sources import DerivedMetricSource
 
@@ -155,7 +192,7 @@ def _derived_ev(
             value=value,
             period=period,
         ),
-        text=f"{metric_label(formula_id)} was {format_metric_value(value, 'ratio')}",
+        text=f"{metric_label(formula_id)} was {format_metric_value(value, unit)}",
         retrieval_score=0.9,
     )
 

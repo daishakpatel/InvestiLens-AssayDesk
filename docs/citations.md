@@ -14,8 +14,10 @@ generates nothing itself. Sources: spec §13 (citations), §14 (hallucination/co
   text. `strip_markers` reads `[SOURCE:a]`, `[source_id=a, source_id=b]`, `[cite: a; b]` and a bare
   ID with a known prefix (`[news:12]`); the IDs are then checked like any other.
 - Growth figures cite `derived:<TICKER>:<metric>_<yoy|cagr>:FY<start>-FY<end>` (reports use
-  revenue; chat growth comparisons any stored FY metric, e.g. `net_income_yoy`). No row stores
-  them: the resolver recomputes each from those two years' stored values (ADR-0055, ADR-0066).
+  revenue; chat growth comparisons any stored FY metric, e.g. `net_income_yoy`), and a report's
+  multi-year multiple averages `derived:<TICKER>:<metric>_avg:FY<start>-FY<end>` (e.g.
+  `pe_ratio_avg`, the mean of the years in that span with a value, at least three). No row stores
+  them: the resolver recomputes each from the stored FY values (ADR-0055, ADR-0066, ADR-0069).
 - `persist(session, output, report_id=|chat_message_id=)` — log every claim to
   `claim_verifications` (CIT-005 L6).
 

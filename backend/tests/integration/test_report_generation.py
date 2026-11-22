@@ -267,6 +267,41 @@ def test_revenue_growth_citations_resolve(session: Session) -> None:
         assert len(detail.lineage) == 2
 
 
+def test_valuation_average_is_cited_and_skips_loss_years(session: Session) -> None:
+    """Spec §10.7 "5Y Average P/E", CIT-003 (ADR-0069): the average of the valued years, cited by
+    an ID that recomputes to the same figure; a loss year (no P/E) is left out, not counted as 0."""
+    company = _seed_company(session, "AVG", gross_margin="0.70")
+    for fy, value in ((2021, "10"), (2022, "20"), (2023, None), (2024, "30"), (2025, "40")):
+        session.add(
+            FinancialMetric(
+                company_id=company.id,
+                period=f"FY{fy}",
+                fiscal_year=fy,
+                period_type="FY",
+                metric_name="pe_ratio",
+                metric_value=None if value is None else Decimal(value),
+                unit="x",
+                is_derived=True,
+                source_id=f"derived:AVG:pe_ratio:FY{fy}",
+                is_latest=True,
+            )
+        )
+    session.flush()
+    payload, evidence = build_payload(session, company.id, "valuation_analysis")
+    average = payload["metrics"]["pe_ratio"]["average"]
+    assert average == {
+        "value": "25x",
+        "years": 4,
+        "span": "FY2021 to FY2025",
+        "source_id": "derived:AVG:pe_ratio_avg:FY2021-FY2025",
+    }
+    item = next(e for e in evidence if e.source_id == average["source_id"])
+    detail = resolve_source(session, average["source_id"])
+    assert detail is not None and detail.source.value == item.source.value  # type: ignore[union-attr]
+    assert detail.text == "Price-to-earnings ratio average for FY2021 to FY2025 was 25x"
+    assert len(detail.lineage) == 4
+
+
 def test_report_generation_logs_every_llm_call(session: Session) -> None:
     """Observability audit (OBS-005): report-section LLM calls must log to `llm_calls` like
     chat/embeddings do — this was the gap the Phase 5c audit found (app.research.generator
