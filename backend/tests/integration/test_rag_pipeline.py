@@ -166,7 +166,7 @@ def test_metric_question_skips_document_search(
     def _boom(*_a: object, **_k: object) -> list:  # type: ignore[type-arg]
         raise AssertionError("document search must not run for a pure metric lookup (RAG-030)")
 
-    monkeypatch.setattr(retrieval_mod, "vector_search", _boom)
+    monkeypatch.setattr(retrieval_mod, "vector_search_many", _boom)
     monkeypatch.setattr(retrieval_mod, "keyword_search", _boom)
 
     result = run_retrieval(session, question="What was revenue in fiscal 2025?", ticker="TST")
@@ -181,7 +181,7 @@ def test_two_metric_growth_question_uses_stored_growth(  # RAG-030, ADR-0066
     def _boom(*_a: object, **_k: object) -> list:  # type: ignore[type-arg]
         raise AssertionError("a growth comparison is answered from stored figures")
 
-    monkeypatch.setattr(retrieval_mod, "vector_search", _boom)
+    monkeypatch.setattr(retrieval_mod, "vector_search_many", _boom)
     monkeypatch.setattr(retrieval_mod, "keyword_search", _boom)
     for name, fy, value in (
         ("revenue", 2024, "50000000000"),
@@ -235,7 +235,7 @@ def test_embedding_outage_falls_back_to_keyword_search(
     def _down(*_a: object, **_k: object) -> list:  # type: ignore[type-arg]
         raise RuntimeError("embedding provider unavailable")
 
-    monkeypatch.setattr(retrieval_mod, "vector_search", _down)
+    monkeypatch.setattr(retrieval_mod, "vector_search_many", _down)
     result = run_retrieval(
         session, question="What supply chain risks does the company face?", ticker="TST"
     )
@@ -354,7 +354,7 @@ def test_advice_question_abstains_before_retrieval(
 ) -> None:
     monkeypatch.setattr(
         retrieval_mod,
-        "vector_search",
+        "vector_search_many",
         lambda *a, **k: (_ for _ in ()).throw(AssertionError("no retrieval for advice")),
     )
     result = run_retrieval(session, question="Should I buy this stock?", ticker="TST")
@@ -423,7 +423,7 @@ def test_price_question_is_answered_from_daily_bars(
     def _boom(*_a: object, **_k: object) -> list:  # type: ignore[type-arg]
         raise AssertionError("a stock-price question must not search documents")
 
-    monkeypatch.setattr(retrieval_mod, "vector_search", _boom)
+    monkeypatch.setattr(retrieval_mod, "vector_search_many", _boom)
     monkeypatch.setattr(retrieval_mod, "keyword_search", _boom)
     for day in (date(2026, 9, 25), date(2026, 9, 29)):  # no bar on Saturday the 26th
         session.add(

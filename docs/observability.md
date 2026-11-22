@@ -36,7 +36,9 @@ chat.answer_question (company)
 with `prompt_version` and `section`, inside `generate_report`.)
 
 The default exporter prints spans to stdout (`ConsoleSpanExporter`) — zero infra required for
-local dev or CI. Setting `otel_exporter_otlp_endpoint` switches to a real collector
+local dev or CI. It runs behind a `BatchSpanProcessor`, off the request path: exporting inline put
+a JSON dump of every span inside each request and was the whole read-latency tail in the
+2026-11-22 load test (ADR-0068). Tests discard spans unless they add their own exporter. Setting `otel_exporter_otlp_endpoint` switches to a real collector
 (Jaeger/Tempo/Honeycomb/...) with no code change. `tests/unit/test_tracing.py` proves the
 instrumentation for real, using `InMemorySpanExporter` to assert actual span names/attributes —
 not just that the code runs without crashing.

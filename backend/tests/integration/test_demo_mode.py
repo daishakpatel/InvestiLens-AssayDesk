@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.demo import DEMO_EMAIL, reset_demo_sandbox
 from app.config import get_settings
-from app.db import get_db
+from app.db import get_chat_db, get_db
 from app.main import app
 from app.models import ChatMessage, ChatSession, Company, Document, Filing, User, Watchlist
 
@@ -43,6 +43,7 @@ def client(session: Session, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestCl
     monkeypatch.setattr(session, "commit", session.flush)
     monkeypatch.setattr(get_settings(), "refresh_cookie_secure", False)
     app.dependency_overrides[get_db] = lambda: session
+    app.dependency_overrides[get_chat_db] = lambda: session
     try:
         yield TestClient(app)
     finally:

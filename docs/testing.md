@@ -233,8 +233,15 @@ Reproduce: `CHROME_PATH=<a Chrome binary> npx lighthouse http://localhost:4173/c
 ## Tier 3 — Load (`load/locustfile.py`)
 
 Drives the hot read endpoints (search, company, financials) and, with a token, authenticated chat,
-to check the §8 latency targets. **Not yet run against a deployed stack** — the Tiingo free licence
-blocks a public deploy until swapped (ADR-0007), and Phase 5d provides the hosted target.
+to check the §8 latency targets. **Run locally on 2026-11-22, not yet against a deployed stack** —
+the Tiingo free licence blocks a public deploy until swapped (ADR-0007).
+
+Setup for the rows below: Apple M1 (8 cores, 16 GB), one uvicorn process as in production
+(`backend/Dockerfile`), Postgres 16 + Redis in Docker, Locust on the same machine; dev database
+(five companies); `CACHE_ENABLED=true`, `LLM_PROVIDER=mock` (so chat times exclude model time and
+spend no credit), real Gemini query embeddings. Profile: 50 users (25 read, 25 chat) spawned at 5/s
+for 2 minutes, about 23 requests/s, 0 failures. Retrieval p95 comes from `retrieval_logs`. Code at
+`2403621` plus ADR-0068.
 
 ```
 uv run --with locust locust -f load/locustfile.py --host http://localhost:8000 \
@@ -246,12 +253,23 @@ uv run --with locust locust -f load/locustfile.py --host http://localhost:8000 \
 
 | Metric | Target | p95 measured | Date / notes |
 |--------|--------|--------------|--------------|
-| `GET /companies/{ticker}` (cache hit) | < 150 ms (NFR-001) | _not yet run_ | needs deployed stack + Redis cache (Phase 5c/5d) |
-| `GET /companies/{ticker}` (miss) | < 500 ms (NFR-001) | _not yet run_ | |
-| `GET /companies/search` (cache) | < 300 ms (FR-001) | _not yet run_ | |
-| retrieval (chat) | < 400 ms (NFR-002) | _not yet run_ | |
-| chat first token | < 3 s (NFR-004) | _not yet run_ | needs LLM key |
-| report generation | ≤ 90 s (NFR-003) | _not yet run_ | needs LLM key + worker (Phase 5d) |
+| `GET /companies/{ticker}` (cache hit) | < 150 ms (NFR-001) | **120 ms** (12 ms reads only) | 2026-11-22, local, mixed load ✓ |
+| `GET /companies/{ticker}` (miss) | < 500 ms (NFR-001) | _not isolated_ | only the first request per ticker misses with the cache on |
+| `GET /companies/search` (cache) | < 300 ms (FR-001) | **170 ms** (18 ms reads only) | 2026-11-22, local, mixed load ✓ |
+| `GET /companies/{ticker}/financials` | — | 190 ms (24 ms reads only) | 2026-11-22, local, mixed load |
+| retrieval (chat) | < 400 ms (NFR-002) | **1,453 ms** under load; 662 ms single user | ✗ about 320 ms of it is one Gemini query-embedding round trip from the test machine |
+| chat answer (mock LLM) | < 3 s (NFR-004) | **2.6 s** | full verified turn without model time; a real model adds its own latency. One 61 s outlier in 590, unexplained |
+| report generation | ≤ 90 s (NFR-003) | p50 59–61 s single user | from the live eval (`docs/eval/live.md`), not under load |
+
+The first run found, and ADR-0068 fixed: the default span exporter printing every span inside the
+request (read p95 410–450 ms → 12–24 ms read-only); chat turns holding the shared DB slots for
+seconds, so reads queued and 2% of all requests got 503s (chat now has its own 6 slots: read p95
+700 ms → 120–190 ms under mixed load, at the cost of chat queueing behind other chats); and four
+sequential query embeddings per chat question (now one call: chat p50 3.0 s → 1.2 s). Ten chat
+slots instead of six brought chat p95 to 2.8 s but put read p95 back at 500–600 ms (CPU contention in
+one process), so six it is; chat capacity scales with API instances. The locustfile also sent
+`ticker` instead of `company` to `/chat`, `period_type=annual` instead of `FY` to `/financials`, and
+stopped the whole run when no token was set; all three are fixed.
 
 Record each run here (replace _not yet run_ with the measured p95 + commit SHA + hardware) so the
 NFR claims in the README benchmark table (§31) are backed by data, not assumed.

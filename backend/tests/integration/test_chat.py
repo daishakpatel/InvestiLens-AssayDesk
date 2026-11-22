@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.billing.budget import BudgetExceededError
 from app.chat.service import answer_question
-from app.db import get_db
+from app.db import get_chat_db, get_db
 from app.embeddings.pipeline import embed_pending
 from app.main import app
 from app.models import (
@@ -434,6 +434,7 @@ def test_stream_and_auth_and_feedback_endpoints(
     # so nothing leaks into the shared module DB and the fixture rollback still cleans up.
     monkeypatch.setattr(session, "commit", session.flush)
     app.dependency_overrides[get_db] = lambda: session
+    app.dependency_overrides[get_chat_db] = lambda: session
     try:
         client = TestClient(app)
         # Auth required (ADR-0006): no bearer token → 401.

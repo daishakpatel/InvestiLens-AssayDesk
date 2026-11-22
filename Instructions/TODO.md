@@ -90,7 +90,12 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [x] **`retrieval_mrr` in the published eval is not deterministic** (found 2026-11-17): fixed
       2026-11-18, see "Done". The 2026-11-15 note that blamed commit 262ddb2 for an MRR shift was
       wrong. `[code]`
-- [ ] **Load test never run**: every row of the NFR table in `docs/testing.md` says `_not yet run_`. `[code]`
+- [x] **Load test never run**: run locally 2026-11-22 (`docs/testing.md`, ADR-0068). It found and
+      fixed inline span export, chat starving reads of DB slots, and sequential query embeddings;
+      reads now meet NFR-001/FR-001 under mixed load. `[code]`
+- [ ] **Retrieval misses NFR-002** (< 400 ms): 662 ms p95 single user, 1,453 ms under load; about
+      320 ms is the Gemini query-embedding round trip. Options: cache query embeddings, a closer or
+      local embedding model, fewer query rewrites. Not yet run against a deployed stack. `[code]`
 
 ### Data
 

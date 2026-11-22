@@ -25,7 +25,8 @@ thread: 120 overlapping requests still stalled for 30 seconds.
 1. A route handler that takes a database session, or otherwise blocks, is a plain `def`, which
    FastAPI runs in a worker thread. `async def` is kept for code that only awaits (`/health`,
    the rate limiter, the middleware).
-2. `get_db` admits at most `_REQUEST_SLOTS` (10) requests at a time, waiting on an asyncio
+2. (Amended by ADR-0068: chat turns use `get_chat_db` and their own `_CHAT_SLOTS` (6); the pool
+   holds both.) `get_db` admits at most `_REQUEST_SLOTS` (10) requests at a time, waiting on an asyncio
    semaphore before the request holds a thread or a connection. The pool is sized to match
    (`pool_size=10`, `max_overflow=5` for sessions opened outside a request), so an admitted
    request never waits for a connection, and a thread is only ever busy with real work.

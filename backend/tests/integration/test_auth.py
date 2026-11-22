@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.auth import passwords, service
 from app.auth.ratelimit import LoginThrottle
 from app.config import get_settings
-from app.db import get_db
+from app.db import get_chat_db, get_db
 from app.main import app
 from app.models import (
     Alert,
@@ -65,6 +65,7 @@ def client(session: Session, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestCl
     # TestClient talks http://, so the Secure refresh cookie would never be sent back; relax it.
     monkeypatch.setattr(get_settings(), "refresh_cookie_secure", False)
     app.dependency_overrides[get_db] = lambda: session
+    app.dependency_overrides[get_chat_db] = lambda: session
     try:
         yield TestClient(app)
     finally:
@@ -87,6 +88,8 @@ def real_client(
             yield s
 
     app.dependency_overrides[get_db] = _db
+
+    app.dependency_overrides[get_chat_db] = _db
     try:
         yield TestClient(app)
     finally:
