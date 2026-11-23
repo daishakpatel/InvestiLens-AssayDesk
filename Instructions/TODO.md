@@ -113,9 +113,9 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       Deriving it as assets − equity was rejected because of temporary equity (ADR-0042). Altman's
       original Z also needs a fiscal-year-end price, so years before the stored price history
       are insufficient. `[code]`
-- [ ] **Peer percentiles compare latest fiscal years, not calendar years** (Phase 7d): NVIDIA's
-      January year sits beside December years; the comparison engine's calendarization is not
-      used here. `[code]`
+- [x] **Peer percentiles compare latest fiscal years, not calendar years** (Phase 7d): fixed
+      2026-11-22 (ADR-0070). One calendar year per measure, named in `peer_calendar_year` and on
+      the card; falls back one year when too few peers have filed the latest. `[code]`
 - [ ] **Quarterly ratios are not stored** (quarterly gross/operating margin, ROE): only TTM
       ratios are (Phase 7b scope). The Financials Quarterly view therefore hides the Margins
       charts. `[code]`

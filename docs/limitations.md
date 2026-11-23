@@ -50,9 +50,11 @@ The open-work list behind it is [`Instructions/TODO.md`](../Instructions/TODO.md
 - Red flags are reported events (auditor changes, late filings, restatements, executive
   departures) matched by rules over filing text. The rules for going concern and material
   weakness have no real positive examples in the corpus, so their recall is unmeasured.
-- Peer percentiles compare each company's latest fiscal year, not aligned calendar periods, and
-  rest on small peer sets.
-- Valuation multiples use the latest stored figures. Five-year average multiples are not built.
+- Peer percentiles compare one calendar year (NVIDIA's January FY2026 beside December peers'
+  FY2025), falling back one year when too few peers have filed the latest; they rest on small
+  peer sets.
+- Valuation multiples use the latest stored figures. The research report's five-year average P/E
+  and P/S are means of fiscal-year-end multiples over the years with a value (at least three).
 
 ## AI
 

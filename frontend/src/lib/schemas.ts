@@ -168,6 +168,7 @@ const earningsQuality = z.object({
       latest_ttm: qualityPoint.nullish(),
       peer_percentile: z.string().nullish(),
       peer_count: z.number(),
+      peer_calendar_year: z.number().nullish(),
     }),
   ),
   peers: z.array(z.string()),

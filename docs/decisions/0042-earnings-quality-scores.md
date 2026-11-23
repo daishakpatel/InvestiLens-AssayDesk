@@ -92,7 +92,8 @@ There is no new table.
     input is named). Deriving it as assets − equity was rejected because temporary equity makes
     it inexact.
   - Peer percentiles compare each company's latest fiscal year, so a January year-end and a
-    December year-end sit side by side, and they are withheld below three peers.
+    December year-end sit side by side, and they are withheld below three peers. (Superseded by
+    ADR-0070: one calendar year, which the response names.)
 - Revisit if:
   - we add banks-specific quality measures;
   - a licensed GICS mapping replaces SIC (the Altman variant would follow it);

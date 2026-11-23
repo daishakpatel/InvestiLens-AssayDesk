@@ -95,6 +95,9 @@ describe("status text (DR-EQ-002)", () => {
     expect(peerText(measure("dso", point(), { peer_percentile: "0.75", peer_count: 3 }))).toBe(
       "75th percentile vs 3 peers (latest fiscal year)",
     );
+    // ADR-0070: the calendar year the peers were compared in, when the API says which.
+    const aligned = { peer_percentile: "0.75", peer_count: 3, peer_calendar_year: 2025 };
+    expect(peerText(measure("dso", point(), aligned))).toBe("75th percentile vs 3 peers (calendar 2025)");
     expect(peerText(measure("dso", point(), { peer_percentile: "0.22", peer_count: 3 }))).toMatch(/^22nd/);
   });
 });

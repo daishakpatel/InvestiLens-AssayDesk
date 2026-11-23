@@ -3872,6 +3872,8 @@ export interface components {
             latest_ttm?: components["schemas"]["QualityPoint"] | null;
             /** Metric Name */
             metric_name: string;
+            /** Peer Calendar Year */
+            peer_calendar_year?: number | null;
             /**
              * Peer Count
              * @default 0

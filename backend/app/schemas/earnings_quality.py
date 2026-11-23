@@ -43,6 +43,8 @@ class QualityMeasure(BaseModel):
     # fewer than three peers report it (FR-EQ-010).
     peer_percentile: Decimal | None = None
     peer_count: int = 0
+    # The calendar year compared (NVIDIA's January FY2026 is 2025), ADR-0070.
+    peer_calendar_year: int | None = None
 
 
 class EarningsQualityResponse(BaseModel):

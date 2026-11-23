@@ -7,6 +7,7 @@ the Phase 6a peer set and `percentile_rank`, and is withheld below three peers.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.api._support import freshness_for, metric_to_result
 from app.api.companies import _resolve
+from app.comparison.calendar import calendarized, fiscal_year_end_month
 from app.comparison.peers import suggest_peers
 from app.db import get_db
 from app.finance.concept_map import load_concept_map
@@ -25,7 +27,7 @@ from app.finance.quality_catalog import (
     NOT_APPLICABLE_REASONS,
     SCREENING_CAVEAT,
 )
-from app.models import FinancialMetric
+from app.models import Company, FinancialMetric
 from app.repositories import companies as company_repo
 from app.repositories import metrics as metric_repo
 from app.schemas.earnings_quality import (
@@ -78,26 +80,46 @@ def to_point(row: FinancialMetric, not_applicable_text: str) -> QualityPoint:
     )
 
 
+# The target's latest valued calendar year, or the one before when too few peers have reported
+# it yet (Apple's FY2026 ends in September, before December peers file that year).
+_PEER_YEARS_BACK = 2
+
+
 def _peer_context(
-    db: Session, peer_ids: list[int], latest: dict[str, QualityPoint]
-) -> dict[str, tuple[Decimal | None, int]]:
-    """Per measure: the target's percentile among peers reporting it, and how many do."""
-    values = metric_repo.latest_annual_values(
+    db: Session, company: Company, rows: list[FinancialMetric], peer_ids: list[int]
+) -> dict[str, tuple[Decimal | None, int, int | None]]:
+    """Per measure: the target's percentile among peers in one calendar year, how many peers
+    report it, and which year (§37.1, ADR-0070). NVIDIA's FY2026 (to January 2026) sits beside
+    December peers' FY2025, never beside whichever year a peer filed last."""
+    by_company: dict[tuple[int, str], list[FinancialMetric]] = defaultdict(list)
+    peer_rows = metric_repo.annual_values(
         db, company_ids=peer_ids, metric_names=list(QUALITY_METRICS)
     )
-    out: dict[str, tuple[Decimal | None, int]] = {}
+    for row in [*rows, *peer_rows]:  # the target's N/A years too: they count as its latest years
+        by_company[(row.company_id, row.metric_name)].append(row)
+    fye = {pid: fiscal_year_end_month(c) for pid in peer_ids if (c := db.get(Company, pid))}
+    target_fye = fiscal_year_end_month(company)
+    out: dict[str, tuple[Decimal | None, int, int | None]] = {}
     for name in QUALITY_METRICS:
-        peer_values = [
-            row.metric_value
-            for pid in peer_ids
-            if (row := values.get((pid, name))) is not None and row.metric_value is not None
-        ]
-        point = latest.get(name)
-        if point is None or point.value is None or len(peer_values) < MIN_PEERS:
-            out[name] = (None, len(peer_values))
+        target = calendarized(by_company[(company.id, name)], target_fye)
+        peers = [calendarized(by_company[(pid, name)], fye.get(pid)) for pid in peer_ids]
+        years = sorted(target, reverse=True)[:_PEER_YEARS_BACK]
+        counts = {y: [p[y].metric_value for p in peers if y in p] for y in years}
+        year = next(
+            (
+                y
+                for y in years
+                if target[y].metric_value is not None and len(counts[y]) >= MIN_PEERS
+            ),
+            None,
+        )
+        if year is None:  # hidden: say how many report the latest year
+            out[name] = (None, len(counts[years[0]]) if years else 0, None)
             continue
-        pct = percentile_rank(point.value, [point.value, *peer_values]).value
-        out[name] = (pct, len(peer_values))
+        value = target[year].metric_value
+        peer_values = [v for v in counts[year] if v is not None]
+        pct = percentile_rank(value, [value, *peer_values]).value if value is not None else None
+        out[name] = (pct, len(peer_values), year)
     return out
 
 
@@ -131,8 +153,7 @@ def get_earnings_quality(
     peer_ids = [
         found.id for p in peers if (found := company_repo.get_by_ticker(db, p.ticker)) is not None
     ]
-    latest = {name: pts[-1] for name, pts in points.items() if pts}
-    context = _peer_context(db, peer_ids, latest)
+    context = _peer_context(db, company, rows, peer_ids)
     notes = []
     if len(peer_ids) < MIN_PEERS:
         notes.append(
@@ -144,7 +165,7 @@ def get_earnings_quality(
     for name in QUALITY_METRICS:
         text = MEASURES[name]
         pts = points[name]
-        pct, count = context[name]
+        pct, count, peer_year = context[name]
         measures.append(
             QualityMeasure(
                 metric_name=name,
@@ -156,6 +177,7 @@ def get_earnings_quality(
                 latest_ttm=ttm.get(name),
                 peer_percentile=pct,
                 peer_count=count,
+                peer_calendar_year=peer_year,
             )
         )
     return EarningsQualityResponse(

@@ -6887,6 +6887,17 @@
             "title": "Metric Name",
             "type": "string"
           },
+          "peer_calendar_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Calendar Year"
+          },
           "peer_count": {
             "default": 0,
             "title": "Peer Count",

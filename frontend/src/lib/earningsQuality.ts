@@ -75,11 +75,13 @@ function ordinal(n: number): string {
   return `${n}${suffix ?? "th"}`;
 }
 
-/** "75th percentile vs 3 peers", or null when hidden (fewer than three peers, FR-EQ-010). */
+/** "75th percentile vs 3 peers (calendar 2025)", or null when hidden (fewer than three peers,
+ * FR-EQ-010). Peers are compared in one calendar year, so NVIDIA's January FY2026 is 2025. */
 export function peerText(measure: QualityMeasure): string | null {
   const pct = toNumber(measure.peer_percentile);
   if (pct === null) return null;
-  return `${ordinal(Math.round(pct * 100))} percentile vs ${measure.peer_count} peers (latest fiscal year)`;
+  const year = measure.peer_calendar_year ? `calendar ${measure.peer_calendar_year}` : "latest fiscal year";
+  return `${ordinal(Math.round(pct * 100))} percentile vs ${measure.peer_count} peers (${year})`;
 }
 
 export function latestPoint(measure: QualityMeasure | undefined): QualityPoint | undefined {

@@ -198,3 +198,56 @@ def test_peer_percentile_hidden_below_three_peers(
     assert body["notes"] and "Peer percentiles are hidden" in body["notes"][0]
     assert client.get("/api/v1/companies/NVDA/earnings-quality?years=0").status_code == 422
     assert client.get("/api/v1/companies/ZZZZ/earnings-quality").status_code == 404
+
+
+def test_peer_percentile_compares_one_calendar_year(session: Session) -> None:
+    """§37.1, ADR-0070: a January fiscal year sits beside December peers' prior fiscal year; a
+    peer's newer year is never used; a September company not yet matched falls back one year."""
+    from app.api.earnings_quality import _peer_context
+    from app.finance.metrics import percentile_rank
+
+    def company(ticker: str, fye: str, values: dict[int, str]) -> Company:
+        c = Company(
+            ticker=ticker, cik=f"9{len(ticker)}{ticker}"[:10], name=ticker, fiscal_year_end=fye
+        )
+        session.add(c)
+        session.flush()
+        for fy, value in values.items():
+            session.add(
+                FinancialMetric(
+                    company_id=c.id,
+                    period=f"FY{fy}",
+                    fiscal_year=fy,
+                    period_type="FY",
+                    metric_name="dso",
+                    metric_value=Decimal(value),
+                    unit="days",
+                    is_derived=True,
+                    source_id=f"derived:{ticker}:dso:FY{fy}",
+                    is_latest=True,
+                )
+            )
+        session.flush()
+        return c
+
+    peers = [
+        company("DECA", "12-31", {2024: "100", 2025: "10", 2026: "1000"}),  # 2026: a newer year
+        company("DECB", "12-31", {2024: "200", 2025: "20"}),
+        company("DECC", "12-31", {2024: "300", 2025: "30"}),
+    ]
+    ids = [p.id for p in peers]
+    january = company("JANX", "01-26", {2025: "5", 2026: "25"})  # FY2026 = calendar 2025
+
+    def context(target: Company) -> tuple[Decimal | None, int, int | None]:
+        rows = list(
+            session.scalars(select(FinancialMetric).where(FinancialMetric.company_id == target.id))
+        )
+        return _peer_context(session, target, rows, ids)["dso"]
+
+    expected = percentile_rank(Decimal("25"), [Decimal(v) for v in ("25", "10", "20", "30")]).value
+    assert context(january) == (expected, 3, 2025)
+
+    # FY2026 to September 2026 is calendar 2026, which only one peer has: compare calendar 2025.
+    september = company("SEPX", "09-27", {2025: "15", 2026: "40"})
+    expected = percentile_rank(Decimal("15"), [Decimal(v) for v in ("15", "10", "20", "30")]).value
+    assert context(september) == (expected, 3, 2025)
