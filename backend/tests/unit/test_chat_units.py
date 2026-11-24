@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.chat.service import ChatTurn, _is_followup, _plain_text
+from app.chat.service import ChatTurn, _is_followup
 from app.chat.streaming import sse_events
 from app.chat.suggestions import suggest
+from app.citation.markdown import plain_text as _plain_text
 from app.rag.types import Intent
 from app.schemas.chat import Citation
 

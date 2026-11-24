@@ -44,10 +44,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       fixed 2026-11-01 (ADR-0053), see "Done". The queries are still fixed keywords, but each
       section now searches only its own filing sections, latest 10-K onward. `[code]`
 - [x] **Price questions go to document search**: fixed 2026-11-01 (ADR-0054), see "Done".
-- [ ] **Report speed**: sections now run concurrently (ADR-0055). At the default
-      `LLM_RATE_LIMIT_PER_SEC` (0.25) on `gemini-3.8-flash`: Apple 58 s, AMD 72 s, NVIDIA 75 s,
-      Intel 76 s, JPMorgan 97 s (2026-11-03), against 85–100 s before and a 90 s target (NFR-003).
-      JPMorgan is still over. A higher limit is untried and now sets the speed. `[code]`
+- [x] **Report speed**: sections run concurrently (ADR-0055) and the model pace sets the time.
+      JPMorgan, the slowest, on `gemini-3.8-flash` (2026-11-22): 109 s at the default
+      `LLM_RATE_LIMIT_PER_SEC` 0.25, 71 s at 1.0, 51 s at 2.0; Intel 32 s at 2.0; no rate-limit
+      errors and every report complete. Local `.env` now sets 2.0 (paid key); the code default
+      stays 0.25 for free-tier keys, and `.env.example` says when to raise it (NFR-003). `[code]`
 - [x] **Reports cite revenue growth IDs that do not resolve**: fixed 2026-11-03 (ADR-0055). Reports
       generated earlier keep their old IDs, which still do not resolve. `[code]`
 - [x] **A report whose model calls all fail is saved as `complete`**: fixed 2026-11-05 (ADR-0056),
@@ -57,7 +58,10 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [x] **Starting Celery beat locally embeds the whole backlog**: `EMBED_EXHIBITS` defaults to false
       since 2026-11-07 (ADR-0058), see "Done". Beat still fires overdue jobs at once, so filings
       themselves are embedded on first start, as intended. `[code]`
-- [ ] Comparison commentary and filing-diff adjudication have never run on a real model. `[notes]`
+- [x] Comparison commentary and filing-diff adjudication have never run on a real model: both
+      checked live 2026-11-22. Commentary was verified as one Markdown blob and never logged; fixed
+      (ADR-0071). Adjudication had run inside reports (127 calls); 15 spot-checked pairs were all
+      judged correctly, though no "different passage" verdict came up. `[code]`
 
 ### Measured numbers (§36 #20)
 

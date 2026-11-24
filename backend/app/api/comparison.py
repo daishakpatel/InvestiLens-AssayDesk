@@ -112,4 +112,6 @@ def commentary(
         g = gather(db, body.tickers, metrics=body.metrics, period=body.period)
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return generate_commentary(db, g)
+    out = generate_commentary(db, g, user_id=user.id)
+    db.commit()  # keeps the llm_calls row the budget check reads
+    return out

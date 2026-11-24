@@ -159,6 +159,38 @@ def test_commentary_is_cited_and_verified(session: Session) -> None:
     assert all(c.status in ("accepted", "softened") for c in out.claims)
 
 
+def test_markdown_commentary_is_verified_sentence_by_sentence_and_logged(
+    session: Session,
+) -> None:
+    """ADR-0071: headings and bullets made a whole answer one "claim"; it is plain text now, each
+    sentence verified, and the model call is logged against the user's AI budget."""
+    from app.comparison.commentary import build_evidence
+    from app.models import LlmCall
+
+    g = gather(session, list(_TICKERS), metrics=["revenue"])
+    first, second = (item.source_id for item in build_evidence(g)[:2])
+
+    class MarkdownLLM(FakeLLM):
+        async def complete(self, messages, *, model, max_tokens):  # type: ignore[no-untyped-def]
+            return (
+                "### Revenue\n"
+                f"* **Scale:** the first company's revenue was the larger [SOURCE:{first}].\n"
+                f"* The second company's revenue is listed too [SOURCE:{second}].\n"
+                "* Industry revenue rose 12% last year."
+            )
+
+    user = User(email="commentary@example.com", password_hash="x", is_active=True)  # noqa: S106
+    session.add(user)
+    session.flush()
+    out = generate_commentary(session, g, llm=MarkdownLLM(), user_id=user.id)
+    assert "#" not in out.rendered_text and "**" not in out.rendered_text
+    assert len(out.claims) == 3  # one per sentence, not one for the whole answer
+    aside = out.claims[-1]  # verified on its own, so it is caught for having no citation
+    assert (aside.status, aside.reason_code) == ("rejected", "NO_CITATION")
+    logged = session.scalars(select(LlmCall).where(LlmCall.user_id == user.id)).all()
+    assert [c.purpose for c in logged] == ["comparison_commentary"]
+
+
 def test_commentary_never_contains_advice(
     session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:

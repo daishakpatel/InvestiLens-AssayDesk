@@ -21,6 +21,7 @@ from app.billing.budget import check_budget
 from app.billing.cost import estimate_cost
 from app.chat.suggestions import suggest
 from app.citation.evidence import EvidenceItem
+from app.citation.markdown import plain_text as _plain_text
 from app.citation.pipeline import verify_text
 from app.citation.resolver import resolve_source
 from app.config import Settings, get_settings
@@ -58,11 +59,6 @@ _SYNTH_RULES = (
 _FOLLOWUP = re.compile(r"^\s*(and|also|but|then|ok|what about|how about|what of|and for)\b", re.I)
 # A pronoun that can only point back at the previous question ("what drove it?").
 _ANAPHOR = re.compile(r"\b(it|its|that|this|these|those|they|them|their)\b", re.I)
-# Markdown the model was told not to write. Answers are split into sentences, checked and
-# re-joined, so it would otherwise show up as stray "*" and "###" or cut a claim off its citation.
-_MD_RULE = re.compile(r"^[ \t]*([-*_])\1{2,}[ \t]*$\n?", re.M)
-_MD_HEADING = re.compile(r"^[ \t]{0,3}#{1,6}[ \t].*$\n?", re.M)
-_MD_BULLET = re.compile(r"^[ \t]*(?:[*\-\u2022]|\d{1,2}[.)])[ \t]+", re.M)
 _LABEL_RANK: dict[EvidenceLabel, int] = {
     "strongly_supported": 3,
     "supported": 2,
@@ -106,13 +102,6 @@ def _is_followup(question: str) -> bool:
     if _FOLLOWUP.search(question) or len(question.split()) <= 2:
         return True
     return bool(_ANAPHOR.search(question))
-
-
-def _plain_text(answer: str) -> str:
-    """The model's answer with Markdown removed, keeping its sentences and citation markers."""
-    text = _MD_HEADING.sub("", _MD_RULE.sub("", answer))
-    text = _MD_BULLET.sub("", text).replace("**", "").replace("__", "")
-    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _effective_question(session: Session, session_id: int, question: str, *, window: int) -> str:

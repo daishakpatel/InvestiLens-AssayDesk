@@ -96,7 +96,9 @@ Every LLM call in the system logs to `llm_calls` (tokens, cost, latency, prompt 
 status) through exactly three choke points: `app/chat/service.py` (purpose=`chat`),
 `app/embeddings/pipeline.py` (purpose=`embedding`), and `app/research/generator.py`
 (purpose=`report_section`, logs **both** the initial attempt and the one repair retry).
-Query rewriting, reranking, and news categorization are rule-based/deterministic (ADR-0003,
+Later features log under their own purpose; comparison commentary (`comparison_commentary`,
+against the requesting user) logged nothing until ADR-0071, so its spend never reached the AI
+budget. Query rewriting, reranking, and news categorization are rule-based/deterministic (ADR-0003,
 ADR-0014) — they never call an LLM, so there is nothing to log for them.
 
 **Audit finding, fixed this phase:** `app/research/generator.py` called `llm.complete_json`

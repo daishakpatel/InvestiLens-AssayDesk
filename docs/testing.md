@@ -259,7 +259,7 @@ uv run --with locust locust -f load/locustfile.py --host http://localhost:8000 \
 | `GET /companies/{ticker}/financials` | — | 190 ms (24 ms reads only) | 2026-11-22, local, mixed load |
 | retrieval (chat) | < 400 ms (NFR-002) | **1,453 ms** under load; 662 ms single user | ✗ about 320 ms of it is one Gemini query-embedding round trip from the test machine |
 | chat answer (mock LLM) | < 3 s (NFR-004) | **2.6 s** | full verified turn without model time; a real model adds its own latency. One 61 s outlier in 590, unexplained |
-| report generation | ≤ 90 s (NFR-003) | p50 59–61 s single user | from the live eval (`docs/eval/live.md`), not under load |
+| report generation | ≤ 90 s (NFR-003) | p50 59–61 s single user; JPMorgan 51 s, Intel 32 s at `LLM_RATE_LIMIT_PER_SEC=2.0` | live eval (`docs/eval/live.md`) at the default 0.25; JPMorgan takes 109 s at 0.25 (2026-11-22), not under load ✓ with a paid-key pace |
 
 The first run found, and ADR-0068 fixed: the default span exporter printing every span inside the
 request (read p95 410–450 ms → 12–24 ms read-only); chat turns holding the shared DB slots for
