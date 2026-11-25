@@ -10,10 +10,9 @@ Two kinds of metric here, by how they're updated:
   depth, job/ingestion failure rate) — cheaper than keeping them live-updated and always correct
   for the current DB state, matching how `app/observability/alerts.py` evaluates the same data.
 
-`cache_hit_ratio` is deliberately a no-op gauge: no cache layer exists yet (the RAG-050 semantic
-cache was deferred past Phase 2c/3c). The metric name and a Grafana panel exist so the dashboard
-is ready the day a cache lands; until then it reports `NaN` (Prometheus's "no data" value) rather
-than a fabricated number.
+`cache_access_total` counts every Redis cache lookup by family (ADR-0024, ADR-0072).
+`cache_hit_ratio` is still a no-op gauge reporting `NaN` (Prometheus's "no data" value): nothing
+computes it from the counter yet, and a made-up number would be worse than none.
 """
 
 from __future__ import annotations

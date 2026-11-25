@@ -331,3 +331,40 @@ def test_financials_quarterly_and_ttm_params(
     assert len(annual) > 8  # FY keeps every year unless a limit is given
     assert client.get(url, params={"period_type": "Q", "limit": 21}).status_code == 422
     assert client.get(url, params={"period_type": "WEEK"}).status_code == 422
+
+
+@pytest.mark.parametrize("ticker", ["NVDA", "JPM"])
+def test_quarter_margins_ttm_returns_and_annual_roic_cagr(
+    session: Session, tmp_path: Path, ticker: str
+) -> None:
+    """§10.3/§37.7 (ADR-0073): quarterly margins, TTM net margin/ROE/ROA, annual ROIC and 3-year
+    revenue CAGR are stored; a Q4 trailing window equals its fiscal year; a bank's are N/A."""
+    from app.finance.ratio_builder import build_company_ratios
+
+    company = _fixture_company(session, ticker, tmp_path)
+    build_company_ratios(session, company)
+
+    def value(metric: str, period: str) -> Decimal | None:
+        rows = _rows(session, company, metric_name=metric, period=period)
+        assert rows, (metric, period)
+        return rows[0].metric_value
+
+    quarters = _rows(session, company, metric_name="net_margin", period_type="Q")
+    assert quarters and all(r.metric_value is not None for r in quarters)
+    fy = max(r.fiscal_year for r in quarters if r.fiscal_quarter == 4 and r.fiscal_year)
+    for metric in ("net_margin", "roe", "roa"):
+        assert value(metric, f"TTM-Q4-FY{fy}") == value(metric, f"FY{fy}"), metric
+
+    gross = _rows(session, company, metric_name="gross_margin", period_type="Q")
+    roic = _rows(session, company, metric_name="roic", period_type="FY")
+    cagr = _rows(session, company, metric_name="revenue_cagr_3y", period_type="FY")
+    assert cagr and all(r.metric_value is not None for r in cagr)
+    assert min(r.fiscal_year or 0 for r in cagr) >= min(r.fiscal_year or 0 for r in roic) + 3
+    if ticker == "JPM":  # DR-042: a bank has no gross margin or invested capital, never a number
+        assert gross and all(r.metric_value is None for r in gross)
+        assert roic and all(r.metric_value is None for r in roic)
+    else:
+        assert gross and all(r.metric_value is not None for r in gross)
+        latest = next(r for r in roic if r.fiscal_year == fy)
+        assert latest.metric_value is not None
+        assert resolve_source(session, latest.source_id or "") is not None

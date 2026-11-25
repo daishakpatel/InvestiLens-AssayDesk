@@ -25,6 +25,7 @@ _LABELS = {
     "eps_diluted": "Diluted EPS",
     "shares_diluted_weighted": "Diluted shares",
     "yoy_growth": "Revenue growth",
+    "revenue_cagr_3y": "Revenue 3-year CAGR",
     "fcf_margin": "Free cash flow margin",
     "fcf_yield": "Free cash flow yield",
     "roe": "Return on equity",

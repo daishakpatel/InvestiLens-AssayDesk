@@ -121,7 +121,8 @@ same as a December one. Cash-flow items arrive year-to-date in 10-Qs and are de-
 (Q2 = 6M − 3M, Q3 = 9M − 6M, Q4 = FY − 9M); income-statement items arrive as quarters, with
 Q4 = FY − (Q1 + Q2 + Q3); balances are read at each quarter end. `quarterly_builder.py`, run by
 `build_company_metrics`, stores the last 12 quarters and every complete four-quarter TTM (with
-TTM margins from TTM sums, never averaged quarterly ratios), each derived row citing its inputs,
+TTM margins and returns from TTM sums, never averaged quarterly ratios; each quarter's own margins
+too, ADR-0073), each derived row citing its inputs,
 and writes a `metric_gaps` row, with a reason, for every quarter or window it cannot compute.
 
 **Earnings quality** (Phase 7d, ADR-0042): `app/finance/beneish.py` (8-variable M-score),

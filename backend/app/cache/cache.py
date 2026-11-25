@@ -83,6 +83,50 @@ def get_or_load(
         return loader()
 
 
+def get_or_load_many(
+    family: str,
+    keys: list[list[str]],
+    *,
+    loader: Callable[[list[int]], list[Any]],
+    ttl: int,
+    settings: Settings | None = None,
+) -> list[Any]:
+    """`get_or_load` for a batch: one MGET, then `loader(indices of the misses)` once, so the
+    misses still share one call (a query-embedding batch, ADR-0072). Same CACHE-005 rule: a Redis
+    error reads as all misses and a failed write is ignored; the loader never runs twice."""
+    settings = settings or get_settings()
+    if not settings.cache_enabled:
+        return loader(list(range(len(keys))))
+    names = [_key(settings, family, *parts) for parts in keys]
+    found: list[Any] = [None] * len(keys)
+    client: Any = None
+    try:
+        client = _RedisClient.get(settings)
+        for i, cached in enumerate(client.mget(names)):
+            if cached is not None:
+                found[i] = json.loads(cached)
+    except Exception as exc:  # CACHE-005
+        log_event(logger, logging.WARNING, "cache.fallback_to_db", family=family, error=str(exc))
+        client = None
+    missing = [i for i, value in enumerate(found) if value is None]
+    for i in range(len(keys)):
+        record_cache_access(family=family, hit=i not in missing)
+    if missing:
+        for i, value in zip(missing, loader(missing), strict=True):
+            found[i] = value
+        if client is not None:
+            try:
+                pipe = client.pipeline()
+                for i in missing:
+                    pipe.set(names[i], json.dumps(found[i], default=str), ex=ttl)
+                pipe.execute()
+            except Exception as exc:  # CACHE-005: the values are already in hand
+                log_event(
+                    logger, logging.WARNING, "cache.write_failed", family=family, error=str(exc)
+                )
+    return found
+
+
 def _load_with_lock(
     client: Any,
     key: str,

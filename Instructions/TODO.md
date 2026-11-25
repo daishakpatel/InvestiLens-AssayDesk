@@ -97,12 +97,11 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [x] **Load test never run**: run locally 2026-11-22 (`docs/testing.md`, ADR-0068). It found and
       fixed inline span export, chat starving reads of DB slots, and sequential query embeddings;
       reads now meet NFR-001/FR-001 under mixed load. `[code]`
-- [ ] **Retrieval misses NFR-002** (< 400 ms): 662 ms p95 single user, 1,453 ms under load; about
-      320 ms is the Gemini query-embedding round trip. Options: cache query embeddings, a closer or
-      local embedding model, fewer query rewrites. Not yet run against a deployed stack. `[code]`
-
-### Data
-
+- [ ] **Retrieval misses NFR-002** (< 400 ms) for new questions: 662 ms p95 single user, 1,453 ms
+      under load; about 320 ms is the Gemini query-embedding round trip. Repeated and suggested
+      questions now hit a Redis cache of query vectors (ADR-0072): 219-263 ms against 895 ms on
+      the first ask (with `CACHE_ENABLED=true`). Left: a closer or local embedding model; not yet
+      run against a deployed stack. `[code]`
 - [x] **Valuation uses fiscal-year figures, not TTM** (ADR-0036): already fixed in Phase 7h
       (ADR-0046); confirmed 2026-11-15. The latest-close rows behind every *current* multiple
       (header, report, portfolio, peers, earnings, thesis KPIs) use TTM as filed by the price date
@@ -120,9 +119,9 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [x] **Peer percentiles compare latest fiscal years, not calendar years** (Phase 7d): fixed
       2026-11-22 (ADR-0070). One calendar year per measure, named in `peer_calendar_year` and on
       the card; falls back one year when too few peers have filed the latest. `[code]`
-- [ ] **Quarterly ratios are not stored** (quarterly gross/operating margin, ROE): only TTM
-      ratios are (Phase 7b scope). The Financials Quarterly view therefore hides the Margins
-      charts. `[code]`
+- [x] **Quarterly ratios are not stored**: done 2026-11-23 (ADR-0073). Each quarter has gross,
+      operating and net margin; TTM adds net margin, ROE and ROA. A single quarter's ROE is not
+      stored on purpose, and quarterly FCF margin waits on quarterly free cash flow. `[code]`
 - [ ] **TTM EPS right after a split**: the identity takes each term's latest restatement, but a
       split after the last 10-K and before any filing restates the prior year still mixes share
       bases; the `share_count_changed` flag marks such windows (ADR-0040). `[code]`
@@ -192,9 +191,8 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [ ] **Insiders & ownership** (§10.15): no Form 4 / 13F ingestion; endpoints return `[]`; the
       `ownership` route redirects to overview. `[code]`
 - [ ] **DCF and scenario tools** (§37.6): nothing exists. `[code]`
-- [ ] **ROIC (annual) and revenue CAGR are still unpersisted** (§37.7 leftovers): Phase 7d
-      stores the earnings-quality measures (below, "Done") and 7b stores TTM ROIC, but no annual
-      ROIC or multi-year CAGR row exists. `[code]`
+- [x] **ROIC (annual) and revenue CAGR are still unpersisted**: done 2026-11-23 (ADR-0073):
+      annual `effective_tax_rate`, `roic` and `revenue_cagr_3y` rows, inputs cited. `[code]`
 - [ ] **Consensus estimates** (§37.3, ADR-0047): "beat/miss vs Street" and surprise
       percentages need a licensed estimates source; none exists, so only company guidance is
       compared (Phase 7i). Transcripts are deferred (ADR-0011). `[decision]`

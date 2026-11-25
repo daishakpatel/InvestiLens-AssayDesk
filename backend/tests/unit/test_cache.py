@@ -81,3 +81,42 @@ def test_redis_down_falls_back_to_db(monkeypatch: pytest.MonkeyPatch) -> None:
 
     result = cache.get_or_load("company", ["NVDA"], loader=lambda: {"ok": True})
     assert result == {"ok": True}  # served from loader despite Redis being down
+
+
+def test_many_loads_only_the_misses_in_one_call(enabled: fakeredis.FakeRedis) -> None:
+    """ADR-0072: a batch reads every key at once and loads only the misses, together."""
+    calls: list[list[int]] = []
+
+    def loader(indices: list[int]) -> list[Any]:
+        calls.append(indices)
+        return [[i * 1.5] for i in indices]
+
+    keys = [["m", "a"], ["m", "b"], ["m", "c"]]
+    assert cache.get_or_load_many("query_embedding", keys[:1], loader=loader, ttl=60) == [[0.0]]
+    assert cache.get_or_load_many("query_embedding", keys, loader=loader, ttl=60) == [
+        [0.0],  # cached by the first call, so not reloaded
+        [1.5],
+        [3.0],
+    ]
+    assert calls == [[0], [1, 2]]
+    assert cache.get_or_load_many("query_embedding", keys, loader=loader, ttl=60)[2] == [3.0]
+    assert len(calls) == 2  # all hits now
+
+
+def test_many_with_redis_down_loads_everything_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CACHE-005 for batches: a read error means all misses; the loader still runs only once."""
+    monkeypatch.setattr(get_settings(), "cache_enabled", True)
+
+    class _Broken:
+        def mget(self, *a: Any, **k: Any) -> Any:
+            raise ConnectionError("redis down")
+
+    monkeypatch.setattr(cache._RedisClient, "get", classmethod(lambda cls, settings: _Broken()))
+    calls: list[list[int]] = []
+
+    def loader(indices: list[int]) -> list[Any]:
+        calls.append(indices)
+        return [{"i": i} for i in indices]
+
+    result = cache.get_or_load_many("query_embedding", [["a"], ["b"]], loader=loader, ttl=60)
+    assert result == [{"i": 0}, {"i": 1}] and calls == [[0, 1]]

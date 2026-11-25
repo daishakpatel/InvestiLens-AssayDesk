@@ -13,6 +13,7 @@ query rewriting, and orchestration are Phase 2c and deliberately not here.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -21,11 +22,14 @@ from sqlalchemy import ColumnElement, Float, Text, cast, func, select, text
 from sqlalchemy.dialects.postgresql import TSQUERY
 from sqlalchemy.orm import Session
 
+from app.cache import cache
 from app.config import get_settings
 from app.models import DocumentChunk
 from app.providers import get_embedding_client
 from app.providers.base import EmbeddingClient
 from app.rag.types import SearchScope
+
+_QUERY_EMBEDDING_TTL_S = 30 * 24 * 3600  # a model's vector for a text does not change
 
 
 @dataclass
@@ -86,11 +90,24 @@ def vector_search_many(
     """`vector_search` for several queries with one embedding call, not one per query: a chat
     question's 4 rewrites cost 4 sequential round trips before (ADR-0068)."""
     client = get_embedding_client()
-    vectors = asyncio.run(client.embed(list(queries), input_type="query"))  # RAG-010
+    texts = list(queries)
+
+    def embed(indices: list[int]) -> list[list[float]]:
+        vectors = asyncio.run(client.embed([texts[i] for i in indices], input_type="query"))
+        return [[float(x) for x in vector] for vector in vectors]  # RAG-010: query input type
+
+    # A question's embedding never changes for a given model: suggested and repeated questions
+    # skip the provider round trip, about 320 ms of retrieval's 660 ms (ADR-0072).
+    vectors = cache.get_or_load_many(
+        "query_embedding",
+        [[client.model_name, hashlib.sha256(t.encode()).hexdigest()] for t in texts],
+        loader=embed,
+        ttl=_QUERY_EMBEDDING_TTL_S,
+    )
     return [
         vector_search_by_vector(
             session,
-            vector=[float(x) for x in vector],
+            vector=vector,
             company_id=company_id,
             limit=limit,
             model=client.model_name,

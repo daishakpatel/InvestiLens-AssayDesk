@@ -65,6 +65,16 @@ _TTM_FORMULAS = {
         "and end"
     ),
     "roic": "TTM operating income x (1 - TTM tax rate) / (debt + equity - cash) at quarter end",
+    "net_margin": "TTM net income / TTM revenue",
+    "roe": "TTM net income / shareholders' equity at quarter end",
+    "roa": "TTM net income / total assets at quarter end",
+}
+# A quarter's own margins (its flows over its revenue). A quarter's ROE is not stored: one quarter's
+# profit over year-end-style equity reads as a quarter of the annual figure (TTM ROE is stored).
+_QUARTER_MARGINS = {
+    "gross_margin": "Q gross profit / Q revenue",
+    "operating_margin": "Q operating income / Q revenue",
+    "net_margin": "Q net income / Q revenue",
 }
 
 
@@ -208,6 +218,7 @@ def build_quarterly_metrics(
         if _gaps_apply(ctx, metric):
             gaps.extend((metric, q.label, reason) for q, reason in built.gaps.items())
 
+    _quarter_margins(writer, ctx, series, kept)
     debt = _total_debt(writer, ctx, series, kept)
     # A TTM window must lie inside the kept quarters, so every input it cites is stored.
     for as_of in kept[ttm.TTM_QUARTERS - 1 :]:
@@ -215,6 +226,54 @@ def build_quarterly_metrics(
 
     writer.counts.gaps = gaps_repo.replace_company_gaps(session, company.id, gaps)
     return writer.counts
+
+
+def _quarter_margins(
+    writer: _Writer,
+    ctx: QuarterContext,
+    series: dict[str, QuarterlySeries],
+    kept: Sequence[FiscalQuarter],
+) -> None:
+    """Each kept quarter's margins from that quarter's own figures (§10.3), cited to them.
+    Stored when computable or N/A for the sector; a missing input is the input's own gap."""
+    cmap = ctx.concept_map
+    for quarter in kept:
+        end = ctx.ends.get(quarter)
+        if end is None:
+            continue
+        found: dict[str, QuarterValue | None] = {
+            m: series[m].values.get(quarter)
+            for m in (
+                "revenue",
+                "gross_profit",
+                "cost_of_revenue",
+                "operating_income",
+                "net_income",
+            )
+            if m in series
+        }
+
+        def v(metric: str, found: dict[str, QuarterValue | None] = found) -> metrics.Num:
+            value = found.get(metric)
+            return value.value if value else None
+
+        sources: dict[str, str] = {m: q.source_id for m, q in found.items() if q is not None}
+        for result in (
+            metrics.gross_margin(
+                v("gross_profit"),
+                v("revenue"),
+                v("cost_of_revenue"),
+                applicable=cmap.applies("gross_margin"),
+                sources=sources,
+            ),
+            metrics.operating_margin(v("operating_income"), v("revenue"), sources=sources),
+            metrics.net_margin(v("net_income"), v("revenue"), sources=sources),
+        ):
+            if result.value is not None or metrics.MISSING_INPUT not in result.warnings:
+                formula = _QUARTER_MARGINS[result.formula_id]
+                writer.derived(
+                    result.formula_id, quarter, end, result, ttm_row=False, formula=formula
+                )
 
 
 def _gaps_apply(ctx: QuarterContext, metric: str) -> bool:
@@ -393,6 +452,7 @@ def _ttm_ratios(
     store(metrics.operating_margin(v("operating_income"), v("revenue"), sources=sources))
     store(metrics.fcf_margin(v("free_cash_flow"), v("revenue"), sources=sources))
     store(metrics.fcf_conversion(v("free_cash_flow"), v("net_income"), sources=sources))
+    store(metrics.net_margin(v("net_income"), v("revenue"), sources=sources))
     store(_ttm_accruals(series, as_of, v, sources))
 
     # Balances are the latest quarter end's, i.e. their TTM is the balance (FR-QT-008).
@@ -405,6 +465,13 @@ def _ttm_ratios(
         "shareholders_equity": equity.inputs[0].source_id,
         "cash_and_equivalents": cash.inputs[0].source_id,
     }
+    assets = ttm.ttm_for(_values(series, "total_assets"), as_of, kind="stock")
+    if equity.inputs and (equity_id := equity.inputs[0].source_id):
+        roe_src = {**sources, "shareholders_equity": equity_id}
+        store(metrics.roe(v("net_income"), equity.value, sources=roe_src))
+    if assets.inputs and (assets_id := assets.inputs[0].source_id):
+        roa_src = {**sources, "total_assets": assets_id}
+        store(metrics.roa(v("net_income"), assets.value, sources=roa_src))
     store(
         metrics.roic(
             v("operating_income"),

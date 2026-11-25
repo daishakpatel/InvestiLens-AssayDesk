@@ -22,6 +22,7 @@ from app.repositories import metrics as metrics_repo
 from app.schemas.sources import MetricResult
 
 _DERIVED_ACCESSION = "derived"  # non-null sentinel so the upsert key is idempotent
+_CAGR_YEARS = 3
 
 
 class Canonical:
@@ -98,7 +99,7 @@ def persist_derived(
 
 
 def _compute_year(
-    canonical: Canonical, cmap: ConceptMap, fy: int, prior: int | None
+    canonical: Canonical, cmap: ConceptMap, fy: int, prior: int | None, ticker: str = ""
 ) -> list[MetricResult]:
     def v(metric: str, year: int | None = None) -> Decimal | None:
         return canonical.value(year if year is not None else fy, metric)
@@ -157,6 +158,31 @@ def _compute_year(
         metrics.capex_intensity(v("capex"), v("revenue"), sources=src("capex", "revenue")),
         debt,
     ]
+    # Annual ROIC beside the stored TTM one (§37.7): the fiscal year's own tax rate and balances.
+    tax = metrics.effective_tax_rate(
+        v("income_tax_expense"),
+        v("pretax_income"),
+        sources=src("income_tax_expense", "pretax_income"),
+    )
+    derived = {
+        "tax_rate": f"derived:{ticker}:effective_tax_rate:FY{fy}",
+        "total_debt": f"derived:{ticker}:total_debt:FY{fy}",
+    }
+    results += [
+        tax,
+        metrics.roic(
+            v("operating_income"),
+            tax.value,
+            debt.value,
+            v("shareholders_equity"),
+            v("cash_and_equivalents"),
+            applicable=cmap.applies("roic"),
+            sources={
+                **src("operating_income", "shareholders_equity", "cash_and_equivalents"),
+                **derived,
+            },
+        ),
+    ]
     fcf = next(r for r in results if r.formula_id == "free_cash_flow")
     results.append(metrics.fcf_margin(fcf.value, v("revenue"), sources=src("revenue")))
     if prior is not None:
@@ -184,7 +210,24 @@ def build_company_ratios(session: Session, company: Company) -> int:
     written = 0
     for index, fy in enumerate(years):
         prior = years[index - 1] if index > 0 else None
-        for result in _compute_year(canonical, cmap, fy, prior):
+        for result in _compute_year(canonical, cmap, fy, prior, company.ticker):
             persist_derived(session, company.id, company.ticker, fy, result)
+            written += 1
+        start = fy - _CAGR_YEARS  # spec §10.2 "3-Year CAGR", stored only once the start year exists
+        if canonical.value(start, "revenue") is not None:
+            cagr = metrics.cagr(
+                canonical.value(start, "revenue"),
+                canonical.value(fy, "revenue"),
+                _CAGR_YEARS,
+                sources={
+                    k: s
+                    for k, s in (
+                        ("start", canonical.source(start, "revenue")),
+                        ("end", canonical.source(fy, "revenue")),
+                    )
+                    if s
+                },
+            )
+            persist_derived(session, company.id, company.ticker, fy, cagr, name="revenue_cagr_3y")
             written += 1
     return written

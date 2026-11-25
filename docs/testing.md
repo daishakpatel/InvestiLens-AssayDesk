@@ -257,7 +257,7 @@ uv run --with locust locust -f load/locustfile.py --host http://localhost:8000 \
 | `GET /companies/{ticker}` (miss) | < 500 ms (NFR-001) | _not isolated_ | only the first request per ticker misses with the cache on |
 | `GET /companies/search` (cache) | < 300 ms (FR-001) | **170 ms** (18 ms reads only) | 2026-11-22, local, mixed load ✓ |
 | `GET /companies/{ticker}/financials` | — | 190 ms (24 ms reads only) | 2026-11-22, local, mixed load |
-| retrieval (chat) | < 400 ms (NFR-002) | **1,453 ms** under load; 662 ms single user | ✗ about 320 ms of it is one Gemini query-embedding round trip from the test machine |
+| retrieval (chat) | < 400 ms (NFR-002) | **1,453 ms** under load; 662 ms single user; 219–263 ms for a repeated question | ✗ for new questions: about 320 ms is one Gemini query-embedding round trip; ✓ when the question's vector is cached (ADR-0072, 2026-11-23) |
 | chat answer (mock LLM) | < 3 s (NFR-004) | **2.6 s** | full verified turn without model time; a real model adds its own latency. One 61 s outlier in 590, unexplained |
 | report generation | ≤ 90 s (NFR-003) | p50 59–61 s single user; JPMorgan 51 s, Intel 32 s at `LLM_RATE_LIMIT_PER_SEC=2.0` | live eval (`docs/eval/live.md`) at the default 0.25; JPMorgan takes 109 s at 0.25 (2026-11-22), not under load ✓ with a paid-key pace |
 

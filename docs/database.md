@@ -105,6 +105,12 @@ and every complete trailing-twelve-month window (`period_type` TTM, `period` `TT
 | a computed quarter (de-cumulated from YTD, Q4 = FY − ΣQ, quarterly total debt) | `derived:<TICKER>:<metric>:Q<n>-FY<yr>` |
 | a TTM figure (four-quarter sum, TTM EPS, TTM margin/ROIC) | `derived:<TICKER>:<metric>:TTM-Q<n>-FY<yr>` |
 
+Since ADR-0073 each quarter also has its own gross, operating and net margin (`Q gross profit /
+Q revenue`, a `derived:…:Q<n>-FY<yr>` row citing that quarter's figures), and every TTM window
+has net margin, ROE and ROA (TTM net income over quarter-end equity or total assets). No
+single-quarter ROE is stored. Annual rows add `effective_tax_rate`, `roic` and `revenue_cagr_3y`
+(from FY<yr-3>, stored only once that year exists).
+
 Derived rows keep the existing record: `formula_id` (`ytd_decumulation`, `q4_derivation`,
 `ttm_sum`, `ttm_eps_identity`, `gross_margin`, …), `quality_flags.derived` (the formula text,
 e.g. `Q3 = 9M YTD - 6M YTD`) and `quality_flags.inputs` (each input's name and source ID). A

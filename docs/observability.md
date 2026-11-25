@@ -116,14 +116,13 @@ report-generation claims, never chat (which is almost certainly the dominant sou
 verifications once live). Fixed in `app/chat/service.py::_finish`. Regression test:
 `tests/integration/test_chat.py::test_qualitative_question_logs_claim_verifications`.
 
-## 6. Cache hit rate — an honest placeholder
+## 6. Cache hit rate
 
-`cache_hit_ratio` always reports `NaN`. **No cache layer exists yet** — the RAG-050 semantic
-cache (keyed on company + normalized question embedding + data version) was deferred past
-Phase 2c/3c/5b and is still not built; there is no read-through response cache either. Building
-one was explicitly out of scope for this phase ("instruments and hardens what already exists,"
-not new features). The metric name, Grafana panel, and this note exist so the dashboard is ready
-the day a cache lands, rather than silently fabricating a number with nothing behind it.
+The Redis read-through cache (ADR-0024, off unless `CACHE_ENABLED=true`) counts every lookup in
+`cache_access_total{family, result}`: the company profile families and, since ADR-0072,
+`query_embedding` (chat question vectors, 30-day TTL). `cache_hit_ratio` itself still reports
+`NaN`: nothing computes it from the counter yet, so the dashboard shows "no data" rather than a
+made-up number. The RAG-050 semantic answer cache is still not built.
 
 ## 7. Data freshness (§28.3, FRESH-001)
 
