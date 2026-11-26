@@ -38,7 +38,7 @@ jobs:
           echo "Render deploy triggered."
 
       # Post-deploy smoke test (NFR-ME-009, ADR-0050): health, demo mode on, registration closed.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Smoke-test the public demo
         env:
           DEMO_API_URL: ${{ vars.DEMO_API_URL }}
