@@ -30,7 +30,6 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 
 ## 1. Decisions waiting on the project owner
 
-- [ ] **Commit** the uncommitted work listed above.
 - [ ] Product sign-off on AI budget placeholders ($5/user/month, $0.50 in demo, $25/day global). `[notes]`
 - [ ] Form 4 / 13F in scope or not (spec Appendix F #10). `[notes]`
 
@@ -139,8 +138,16 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
       `/sources/{id}` rebuilds it for that close from what was filed by then. IDs dated before
       2026-10-24 (fiscal-year method) stay 404, since rebuilding them would contradict their
       report. `[code]`
-- [ ] **Seed universe is 5 of 10 in dev, 3 in fixtures** (fixtures: NVDA, AAPL, JPM). Missing
-      MSFT, AMZN, TSLA, GOOGL (multi-class shares), META, V, MA (§4.1). `[code]`
+- [ ] **Seed universe: all 10 in dev (2026-11-25), 3 in fixtures** (fixtures: NVDA, AAPL, JPM).
+      MSFT, AMZN, TSLA, GOOGL, META, V and MA were ingested live (408 filings, 54,126 passages,
+      prices, Finnhub news, metrics; no dead letters). Multi-class share counts come from the
+      filings' inline XBRL and stale counts are no longer used (ADR-0074); Visa's market cap and
+      multiples stay missing (as-converted classes not modelled). Left: embed the new passages
+      (~$3-4 of Gemini), governance/guidance/note extraction and research reports for the seven,
+      and their per-company concept gaps in the latest fiscal year: Amazon has no total
+      liabilities tag (as AMD/Intel); Alphabet, Microsoft and Tesla no total D&A (EV/EBITDA);
+      Visa no company-wide diluted EPS (it reports per class); Visa and Mastercard have no cost
+      of revenue, so gross margin shows missing rather than "not applicable". `[code]`
 - [x] **News is sample data**: fixed in the dev database, see "Done", 2026-11-02. The fixtures,
       eval report and public demo stay synthetic on purpose.
 - [x] **News runs fail when the embedding call fails**: fixed 2026-11-05, see "Done". `[code]`
@@ -310,6 +317,8 @@ the audit date. `[notes]` = carried from earlier session hand-offs, not re-check
 - [ ] The Celery Beat schedule and the full daily pipeline. `[notes]`
 - [ ] Light theme screen by screen; real print preview; no toast system. `[notes]`
 - [ ] `app/tasks/` wrappers are mostly 0% covered. `[notes]`
+- [ ] News headline embeddings (news clustering) are not written to `llm_calls`, so their spend
+      is not counted; ~1,700 headlines for seven companies is under a cent (2026-11-25). `[code]`
 
 ## 5. Housekeeping
 

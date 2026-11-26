@@ -8,6 +8,7 @@ from decimal import Decimal
 from app.finance.valuation_builder import (
     PricePoint,
     ShareCount,
+    count_as_of,
     price_on_or_before,
     share_count_for,
     shares_on,
@@ -41,6 +42,17 @@ def test_share_count_for_a_year_end_prefers_the_next_cover_page() -> None:
     assert share_count_for([early, cover, later], date(2026, 1, 25)) == cover
     assert share_count_for([early], date(2026, 1, 25)) == early  # nothing filed after it yet
     assert share_count_for([], date(2026, 1, 25)) is None
+
+
+def test_a_share_count_over_a_year_old_is_not_used() -> None:  # DR-025, ADR-0074
+    # Visa's and Mastercard's only un-dimensioned counts are from 2010: a 2026 market cap built on
+    # them was a fifth of the real one.
+    old = ShareCount(date(2010, 1, 27), Decimal(1), "xbrl:1")
+    recent = ShareCount(date(2025, 11, 1), Decimal(2), "xbrl:2")
+    assert count_as_of([old], date(2026, 11, 25)) is None
+    assert count_as_of([old, recent], date(2026, 11, 1)) == recent  # exactly 365 days old
+    assert share_count_for([old], date(2025, 9, 30)) is None
+    assert share_count_for([old], date(2010, 9, 30)) == old
 
 
 def test_price_on_or_before_takes_the_last_trading_day() -> None:

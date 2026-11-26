@@ -25,7 +25,13 @@ The open-work list behind it is [`Instructions/TODO.md`](../Instructions/TODO.md
 ## Coverage
 
 - The fixtures, the eval report and the public demo cover three companies: NVIDIA, Apple and
-  JPMorgan. The development database adds AMD and Intel. Any other ticker must be ingested first.
+  JPMorgan. The development database has the full seed set (§4.1) plus AMD and Intel: twelve
+  companies. Any other ticker must be ingested first.
+- Visa has no market cap or valuation multiples: its B and C share classes convert into the
+  traded Class A at their own rates, which are not modelled, and summing the classes would
+  misstate the count (ADR-0074). Multi-class companies whose classes are one for one (Alphabet,
+  Meta, Mastercard) sum their cover-page counts. A share count more than a year from the valued
+  date is not used, so early fiscal years can show multiples as missing.
 - US SEC filers only. There are no IFRS filers, no foreign private issuers (20-F/6-K) and no
   non-US exchanges.
 - Banks get no gross margin, operating income, capex, free cash flow, current ratio or similar

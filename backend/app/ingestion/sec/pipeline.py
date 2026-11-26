@@ -26,6 +26,7 @@ from app.cache.cache import invalidate_company
 from app.config import Settings, get_settings
 from app.finance.sic import sic_to_sector
 from app.ingestion.documents.eightk_items import item_codes_in_document
+from app.ingestion.documents.ixbrl import tagged_values
 from app.models import Document
 from app.providers.sec import get_sec_source
 from app.providers.sec.base import CompanyMetadata, CompanyRef, FilingRef, SecSource
@@ -412,6 +413,7 @@ def ingest_company(
     try:
         with session.begin_nested():  # SAVEPOINT: facts failure doesn't lose the filings
             rows, skipped = _parse_facts(company_id, sec, ref.cik)
+            rows += _cover_share_rows(session, company_id, rows, storage)
             counts.facts = facts_repo.replace_company_facts(
                 session, company_id=company_id, facts=rows
             )
@@ -456,6 +458,58 @@ def _parse_facts(company_id: int, sec: SecSource, cik: str) -> tuple[list[dict[s
     from app.ingestion.sec.xbrl import parse_companyfacts
 
     return parse_companyfacts(company_id, sec.companyfacts(cik))
+
+
+SHARES_CONCEPT = "dei:EntityCommonStockSharesOutstanding"
+
+
+def _cover_share_rows(
+    session: Session, company_id: int, rows: list[dict[str, Any]], storage: ObjectStorage
+) -> list[dict[str, Any]]:
+    """Cover-page share counts read from the inline XBRL of each 10-K/10-Q that companyfacts has
+    no count for (ADR-0074). companyfacts leaves out dimensioned facts, so a multi-class filer
+    (Alphabet, Meta, Mastercard, Visa) reports its counts per class and has none there."""
+    counted = {r["accession_number"] for r in rows if r["concept_tag"] == SHARES_CONCEPT}
+    out: list[dict[str, Any]] = []
+    for form in ("10-K", "10-Q"):
+        for filing in filing_repo.list_filings_by_type(
+            session, company_id=company_id, filing_type=form
+        ):
+            if filing.accession_number in counted or not filing.raw_document_location:
+                continue
+            try:
+                html = storage.get(filing.raw_document_location).decode("utf-8", errors="ignore")
+            except Exception as exc:  # a missing raw file leaves this filing uncounted, logged
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    "sec.cover_shares.unreadable",
+                    accession=filing.accession_number,
+                    error=str(exc),
+                )
+                continue
+            values = [v for v in tagged_values(html) if v.concept == SHARES_CONCEPT]
+            # A total, when the cover gives one; otherwise one row per class, summed at valuation.
+            totals = [v for v in values if not v.context.members]
+            for v in totals or values:
+                out.append(
+                    {
+                        "company_id": company_id,
+                        "accession_number": filing.accession_number,
+                        "concept_tag": SHARES_CONCEPT,
+                        "context_id": None,
+                        "period_start": None,
+                        "period_end": v.context.period_end,
+                        "period_type": "instant",
+                        "dimensions": dict(v.context.members) or None,
+                        "value": v.value,
+                        "unit": "shares",
+                        "decimals": None,
+                        "filed_date": filing.filing_date,
+                        "is_amended": False,
+                    }
+                )
+    return out
 
 
 @dataclass

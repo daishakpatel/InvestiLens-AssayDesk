@@ -21,13 +21,21 @@ from app.citation import resolver
 from app.citation.resolver import resolve_source
 from app.finance.builder import build_company_metrics
 from app.finance.ratio_builder import build_company_ratios
-from app.finance.valuation_builder import LATEST, VALUATION_METRICS, build_company_valuation
+from app.finance.valuation_builder import (
+    LATEST,
+    VALUATION_METRICS,
+    build_company_valuation,
+    share_counts,
+)
 from app.ingestion.prices import ingest_prices
 from app.ingestion.sec import ingest_company
-from app.models import Company, FinancialMetric, PriceHistory
+from app.ingestion.sec.pipeline import SHARES_CONCEPT, _cover_share_rows
+from app.models import Company, FinancialFact, FinancialMetric, PriceHistory
 from app.providers.prices.mock import MockPriceSource
 from app.providers.sec.mock import MockSecSource
+from app.repositories import facts as facts_repo
 from app.repositories import metrics as metric_repo
+from app.repositories.filings import list_filings_by_type
 from app.utils.storage import FilesystemObjectStorage
 
 
@@ -200,3 +208,65 @@ def test_a_replaced_latest_close_citation_still_resolves(
     # contradict the report that quoted it.
     monkeypatch.setattr(resolver, "LATEST_TTM_SINCE", date(2026, 10, 24))
     assert resolve_source(session, cited["pe_ratio"][0] or "") is None
+
+
+_CLASS = "us-gaap:StatementClassOfStockAxis"
+_COVER_DAY = date(2019, 1, 2)  # no fixture filing reports a count on this day
+
+
+def _class_fact(ref: str, member: str, shares: str) -> str:
+    """One cover-page count for one share class, with its context (inline XBRL)."""
+    return (
+        f'<xbrli:context id="{ref}"><xbrli:segment><xbrldi:explicitMember dimension="{_CLASS}">'
+        f"us-gaap:{member}</xbrldi:explicitMember></xbrli:segment><xbrli:period>"
+        f"<xbrli:instant>{_COVER_DAY}</xbrli:instant></xbrli:period></xbrli:context>"
+        f'<ix:nonFraction name="{SHARES_CONCEPT}" contextRef="{ref}" unitRef="shares">'
+        f"{shares}</ix:nonFraction>"
+    )
+
+
+_TWO_CLASS_COVER = (
+    "<html><body>"
+    + _class_fact("cA", "CommonClassAMember", "2,000")
+    + _class_fact("cB", "CommonClassBMember", "500")
+    + "</body></html>"
+)
+
+
+def test_per_class_cover_counts_are_read_and_summed(session: Session, tmp_path: Path) -> None:
+    """companyfacts drops per-class facts, so a multi-class filer's cover counts come from the
+    filing's inline XBRL; valuation sums the classes unless they convert unevenly (DR-025,
+    ADR-0074)."""
+    storage = FilesystemObjectStorage(tmp_path)
+    ingest_company(session, "NVDA", sec=MockSecSource(), storage=storage)
+    company = session.scalars(select(Company).where(Company.ticker == "NVDA")).one()
+    filing = list_filings_by_type(session, company_id=company.id, filing_type="10-K")[-1]
+    assert filing.raw_document_location
+    storage.put(filing.raw_document_location, _TWO_CLASS_COVER.encode())
+
+    rows = [
+        r
+        for r in _cover_share_rows(session, company.id, [], storage)
+        if r["accession_number"] == filing.accession_number
+    ]
+    assert sorted((r["dimensions"][_CLASS], r["value"]) for r in rows) == [
+        ("us-gaap:CommonClassAMember", Decimal(2000)),
+        ("us-gaap:CommonClassBMember", Decimal(500)),
+    ]
+    assert all(r["filed_date"] == filing.filing_date for r in rows)  # point in time (DR-023)
+    # A filing companyfacts already counts is not read again.
+    counted = [{"accession_number": filing.accession_number, "concept_tag": SHARES_CONCEPT}]
+    assert not [
+        r
+        for r in _cover_share_rows(session, company.id, counted, storage)
+        if r["accession_number"] == filing.accession_number
+    ]
+
+    session.bulk_insert_mappings(FinancialFact, rows)
+    session.flush()
+    summed = [c.shares for c in share_counts(session, company.id) if c.record_date == _COVER_DAY]
+    assert summed == [Decimal(2500)]
+    unsummed = share_counts(session, company.id, sum_classes=False)
+    assert not [c for c in unsummed if c.record_date == _COVER_DAY]
+    # Per-class rows never reach metric selection, which expects company totals.
+    assert all(not f.dimensions for f in facts_repo.facts_for_company(session, company.id))

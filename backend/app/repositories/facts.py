@@ -25,9 +25,9 @@ def replace_company_facts(session: Session, *, company_id: int, facts: list[dict
 
 
 def facts_for_company(session: Session, company_id: int) -> list[FinancialFact]:
-    """Return all stored XBRL facts for a company (input to the concept-map builder)."""
+    """Return a company's company-wide XBRL facts (input to the concept-map builder). Per-class
+    cover-page counts (`dimensions` set, ADR-0074) are left out: they are not company totals."""
     from sqlalchemy import select
 
-    return list(
-        session.scalars(select(FinancialFact).where(FinancialFact.company_id == company_id))
-    )
+    facts = session.scalars(select(FinancialFact).where(FinancialFact.company_id == company_id))
+    return [f for f in facts if not f.dimensions]  # stored as JSON null, so filtered here

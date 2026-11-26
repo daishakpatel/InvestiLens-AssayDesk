@@ -40,6 +40,7 @@ from app.repositories import metrics as metrics_repo
 from app.schemas.sources import MetricResult
 
 SHARES_CONCEPT = "dei:EntityCommonStockSharesOutstanding"
+MAX_COUNT_AGE_DAYS = 366
 LATEST = "LATEST"
 # The latest-close row has used TTM as filed by the price date since ADR-0046; an ID dated earlier
 # was computed from fiscal-year figures, so recomputing it now would contradict the report that
@@ -90,18 +91,25 @@ def shares_on(count: ShareCount, day: date, splits: Sequence[tuple[date, Decimal
     return count.shares / split_factor(splits, day, count.record_date)
 
 
+def _recent(count: ShareCount, day: date) -> bool:
+    """A count more than a year from `day` is stale: covers come every quarter (ADR-0074)."""
+    return abs((count.record_date - day).days) <= MAX_COUNT_AGE_DAYS
+
+
 def count_as_of(counts: Sequence[ShareCount], as_of: date) -> ShareCount | None:
     """The latest share count dated and filed by `as_of` (never one reported later)."""
     known = [c for c in counts if c.record_date <= as_of and (c.filed is None or c.filed <= as_of)]
-    return max(known, key=lambda c: c.record_date) if known else None
+    latest = max(known, key=lambda c: c.record_date) if known else None
+    return latest if latest and _recent(latest, as_of) else None
 
 
 def share_count_for(counts: Sequence[ShareCount], year_end: date) -> ShareCount | None:
     """The cover-page count reported nearest after a year end (its 10-K), else the last before."""
-    after = [c for c in counts if c.record_date >= year_end]
+    near = [c for c in counts if _recent(c, year_end)]
+    after = [c for c in near if c.record_date >= year_end]
     if after:
         return min(after, key=lambda c: c.record_date)
-    before = [c for c in counts if c.record_date < year_end]
+    before = [c for c in near if c.record_date < year_end]
     return max(before, key=lambda c: c.record_date) if before else None
 
 
@@ -111,7 +119,11 @@ def price_on_or_before(prices: Sequence[PricePoint], day: date) -> PricePoint | 
     return prices[index - 1] if index else None
 
 
-def share_counts(session: Session, company_id: int) -> list[ShareCount]:
+def share_counts(
+    session: Session, company_id: int, *, sum_classes: bool = True
+) -> list[ShareCount]:
+    """Cover-page counts, one per filing and date. Per-class counts are summed (DR-025), unless
+    the company's classes convert at other than one for one (`sum_classes` false, ADR-0074)."""
     facts = session.scalars(
         select(FinancialFact).where(
             FinancialFact.company_id == company_id, FinancialFact.concept_tag == SHARES_CONCEPT
@@ -120,6 +132,8 @@ def share_counts(session: Session, company_id: int) -> list[ShareCount]:
     # Multi-class filers report one value per class under the same filing and date (DR-025).
     groups: dict[tuple[str, date], list[FinancialFact]] = {}
     for fact in facts:
+        if fact.dimensions and not sum_classes:
+            continue
         if fact.period_end is not None:
             groups.setdefault((fact.accession_number, fact.period_end), []).append(fact)
     counts = []
@@ -289,7 +303,9 @@ def valuation_at_close(
     derived = derived_values(found)
     return _valued(
         price=price,
-        count=count_as_of(share_counts(session, company.id), price.day),
+        count=count_as_of(
+            share_counts(session, company.id, sum_classes=cmap.sum_share_classes), price.day
+        ),
         splits=load_splits(session, company.id),
         figures={name: value for name, (value, _) in derived.items()},
         # One input row per figure, citing its first fact; `ttm_sources` lists them all.
@@ -346,8 +362,8 @@ def build_company_valuation(session: Session, company: Company) -> int:
     if not prices or not year_end:
         return 0
     splits = load_splits(session, company.id)
-    counts = share_counts(session, company.id)
     cmap = load_concept_map(ticker=company.ticker, cik=company.cik, sector=company.sector)
+    counts = share_counts(session, company.id, sum_classes=cmap.sum_share_classes)
     ev_applies = cmap.applies("ev_ebitda")  # EV-based multiples are N/A for banks (Appendix C)
 
     def persist(

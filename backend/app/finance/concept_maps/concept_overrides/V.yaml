@@ -1,0 +1,7 @@
+# Company-level concept overrides for Visa (CIK 0001403161).
+# Visa's cover page counts Class A, B-1, B-2, B-3 and C shares, but only Class A trades: the others
+# convert into Class A at their own (changing) rates, so summing the counts misstates the share
+# count. Its market cap and multiples stay missing rather than wrong (ADR-0074).
+cik: "0001403161"
+ticker: V
+sum_share_classes: false

@@ -39,6 +39,9 @@ class ConceptMap:
     _footnote_units: dict[str, str] = field(default_factory=dict)
     # Composite tag -> component tags summed into it (company overrides, Phase 7h).
     _composites: dict[str, list[str]] = field(default_factory=dict)
+    # False when share classes convert at other than one for one (Visa): summing them misstates
+    # the share count, so market cap stays missing instead (ADR-0074).
+    sum_share_classes: bool = True
 
     def tags(self, metric: str) -> list[str]:
         """Ordered XBRL tags to try for a canonical metric (first available wins)."""
@@ -141,4 +144,5 @@ def load_concept_map(*, ticker: str = "", cik: str = "", sector: str | None = No
         _footnote_flow=frozenset(base.get("footnote_flow_metrics", [])),
         _footnote_units=dict(base.get("footnote_units", {})),
         _composites={k: list(v) for k, v in override.get("composite_tags", {}).items()},
+        sum_share_classes=bool(override.get("sum_share_classes", True)),
     )

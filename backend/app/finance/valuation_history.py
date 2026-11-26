@@ -72,7 +72,8 @@ def build_valuation_history(session: Session, company: Company) -> int:
         [fact_view_from_orm(f) for f in facts_repo.facts_for_company(session, company.id)],
         cmap.composites,
     )
-    counts, splits = share_counts(session, company.id), load_splits(session, company.id)
+    counts = share_counts(session, company.id, sum_classes=cmap.sum_share_classes)
+    splits = load_splits(session, company.id)
     dates: list[tuple[int | None, date, str]] = [
         (fy, end, FISCAL_YEAR_END) for fy, end in year_ends(session, company.id)
     ]

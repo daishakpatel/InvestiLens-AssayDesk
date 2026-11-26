@@ -73,6 +73,12 @@ lineage (`is_derived`, `formula_id`, `source_id`, `as_reported_accession`, `is_l
 them apart lets us recompute metrics, track restatements, and cite a derived number back to the
 exact facts it came from without mutating source data.
 
+Rows come from SEC companyfacts, which is un-dimensioned (`dimensions` JSON `null`), with one
+exception (ADR-0074): a 10-K/10-Q whose cover-page share count companyfacts lacks has its
+`dei:EntityCommonStockSharesOutstanding` read from the filing's inline XBRL, one row per share
+class with the class in `dimensions` (`{"us-gaap:StatementClassOfStockAxis": "…ClassAMember"}`).
+Only valuation reads these; metric selection (`facts_for_company`) leaves them out.
+
 A derived metric's `source_id` is **company-scoped** — `derived:<TICKER>:<formula_id>:FY<year>`
 (Phase 6a, ADR-0026). It was previously `derived:<formula_id>:FY<year>`, which collided across
 companies and made `GET /sources` ambiguous once comparison put two companies' metrics in one
